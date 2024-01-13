@@ -158,6 +158,8 @@ include user/Makefrag
 
 
 
+CPUS ?= 1
+
 ## QEMU's VMX options have changed over time.  We need to know the
 ## version of qemu to know the right options.
 QEMU_VERSION = $(shell $(QEMU) -version | grep -Po '(?<=QEMU emulator version )\d.\d.\d')
@@ -173,6 +175,7 @@ endif
 QEMUOPTS = -cpu kvm64,+vmx,$(QEMU_VMX_OPTS) $(KVM) -m 256 -drive format=raw,file=$(OBJDIR)/kern/kernel.img -serial mon:stdio -gdb tcp::$(GDBPORT)
 QEMUOPTS += $(shell if $(QEMU) -nographic -help | grep -q '^-D '; then echo '-D qemu.log'; fi)
 IMAGES = $(OBJDIR)/kern/kernel.img
+QEMUOPTS += -smp cpus=$(CPUS),cores=1,threads=1,sockets=$(CPUS)
 QEMUOPTS += $(QEMUEXTRA)
 
 
