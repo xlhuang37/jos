@@ -7,7 +7,13 @@
 #
 
 
+ifdef GUEST_KERN
+OBJDIR := vmm/guest/obj
+GUSETOBJDIR := vmm/guest/obj
+else
 OBJDIR := obj
+endif
+GUESTDIR := vmm/guest
 
 
 
@@ -140,6 +146,13 @@ KERN_CFLAGS := $(CFLAGS) -DJOS_KERNEL -DDWARF_SUPPORT -gdwarf-2 -mcmodel=large -
 BOOT_CFLAGS := $(CFLAGS) -DJOS_KERNEL -gdwarf-2 -m32 -fno-PIC
 USER_CFLAGS := $(CFLAGS) -DJOS_USER -gdwarf-2 -mcmodel=large -m64
 
+ifdef GUEST_KERN
+KERN_CFLAGS += -DVMM_GUEST
+USER_CFLAGS += -DVMM_GUEST
+else
+KERN_CFLAGS += -DVMM_HOST -DTEST_EPT_MAP=1
+USER_CFLAGS += -DVMM_HOST
+endif
 
 # Update .vars.X if variable X has changed since the last make run.
 #
@@ -161,6 +174,9 @@ include lib/Makefrag
 include user/Makefrag
 include fs/Makefrag
 include net/Makefrag
+ifndef GUEST_KERN
+include vmm/Makefrag
+endif
 
 
 
@@ -201,6 +217,31 @@ pre-qemu: .gdbinit
 	@rm -f qemu.pcap
 
 
+guestvm: $(GUESTDIR)/$(OBJDIR)/kern/kernel $(GUESTDIR)/$(OBJDIR)/boot/boot
+
+BOCHS := bochs
+BOCHSOPTS = -q
+BOCHSOPTS += $(BOCHSEXTRA)
+
+bochsrc: .bochsrc.tmpl
+#	BOCHS expects absolute paths
+	$(eval KERN_PATH := $(shell pwd)/$(OBJDIR)/kern/kernel.img)
+	$(eval FS_PATH := $(shell pwd)/$(OBJDIR)/fs/fs.img)
+	sed -e "s,path_to_kernel_img,$(KERN_PATH)," -e "s,path_to_disk_img,$(FS_PATH)," < $^ > $@
+
+bochs: $(IMAGES) bochsrc
+	$(BOCHS) $(BOCHSOPTS)
+
+bochs-nox: $(IMAGES) bochsrc
+	$(BOCHS) $(BOCHSOPTS) 'display_library: term'
+
+bochs-gdb: $(IMAGES) bochsrc
+	$(BOCHS) $(BOCHSOPTS) 'gdbstub: enabled=1, port=1234'
+
+bochs-nox-gdb: $(IMAGES) bochsrc
+	$(BOCHS) $(BOCHSOPTS) 'display_library: term' 'gdbstub: enabled=1, port=1234'
+
+
 qemu: $(IMAGES) pre-qemu
 	$(QEMU) $(QEMUOPTS)
 
@@ -231,6 +272,7 @@ print-gdbport:
 # For deleting the build
 clean:
 	rm -rf $(OBJDIR) .gdbinit jos.in qemu.log
+	rm -rf bochsrc $(GUESTDIR)/$(OBJDIR)
 
 realclean: clean
 	rm -rf lab$(LAB).tar.gz \

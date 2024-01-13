@@ -18,6 +18,14 @@ enum {
 	SYS_ipc_try_send,
 	SYS_ipc_recv,
 	SYS_time_msec,
+	SYS_ept_map,
+	SYS_env_mkguest,
+#ifndef VMM_GUEST
+	SYS_vmx_list_vms,
+	SYS_vmx_sel_resume,
+	SYS_vmx_get_vmdisk_number,
+	SYS_vmx_incr_vmdisk_number,
+#endif
 	NSYSCALLS
 };
 
