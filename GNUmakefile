@@ -155,6 +155,7 @@ include boot/Makefrag
 include kern/Makefrag
 include lib/Makefrag
 include user/Makefrag
+include fs/Makefrag
 
 
 
@@ -176,6 +177,8 @@ QEMUOPTS = -cpu kvm64,+vmx,$(QEMU_VMX_OPTS) $(KVM) -m 256 -drive format=raw,file
 QEMUOPTS += $(shell if $(QEMU) -nographic -help | grep -q '^-D '; then echo '-D qemu.log'; fi)
 IMAGES = $(OBJDIR)/kern/kernel.img
 QEMUOPTS += -smp cpus=$(CPUS),cores=1,threads=1,sockets=$(CPUS)
+QEMUOPTS += -hdb $(OBJDIR)/fs/fs.img
+IMAGES += $(OBJDIR)/fs/fs.img
 QEMUOPTS += $(QEMUEXTRA)
 
 
