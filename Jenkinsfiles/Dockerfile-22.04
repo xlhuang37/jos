@@ -1,0 +1,13 @@
+# Rolling forward to 22.04
+FROM ubuntu:22.04
+
+# Packages needed to build, run, and grade jos
+RUN apt-get clean 
+RUN apt-get update
+RUN DEBIAN_FRONTEND=noninteractive apt-get install -y git gcc make qemu qemu-utils qemu-kvm \
+    python-is-python3
+
+# Build location
+RUN mkdir /oscar
+
+CMD ["bash"]
