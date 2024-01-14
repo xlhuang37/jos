@@ -16,6 +16,5 @@
 /sol?/
 /prep?/
 /prep*.tar.gz
-/conf/lab.mk
 *~
 vivek.map
