@@ -250,8 +250,13 @@ grade:
 	  (echo "'make clean' failed.  HINT: Do you have another running instance of JOS?" && exit 1)
 	./grade-lab$(LAB) $(GRADEFLAGS)
 
+
 update:
-	git pull https://github.com/comp630-s24/jos.git
+ifeq ($(LAB),1)
+	git pull https://github.com/comp630-s24/jos.git main
+else
+	git pull https://github.com/comp630-s24/jos.git lab$(LAB)
+endif
 
 handin: realclean
 	@if [ `git status --porcelain| wc -l` != 0 ] ; then echo "\n\n\n\n\t\tWARNING: YOU HAVE UNCOMMITTED CHANGES\n\n    Consider committing any pending changes and rerunning make handin.\n\n\n\n"; fi
