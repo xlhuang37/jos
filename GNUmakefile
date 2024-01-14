@@ -233,7 +233,7 @@ grade:
 	./grade-lab$(LAB) $(GRADEFLAGS)
 
 update:
-       git pull https://github.com/comp630-s24/jos.git
+	git pull https://github.com/comp630-s24/jos.git
 
 handin: realclean
 	@if [ `git status --porcelain| wc -l` != 0 ] ; then echo "\n\n\n\n\t\tWARNING: YOU HAVE UNCOMMITTED CHANGES\n\n    Consider committing any pending changes and rerunning make handin.\n\n\n\n"; fi
@@ -295,4 +295,4 @@ always:
 	@:
 
 .PHONY: all always \
-	handin tarball clean realclean distclean grade handin-prep handin-check
+	handin tarball clean realclean distclean grade handin-prep handin-check update
