@@ -254,6 +254,10 @@ grade:
 update:
 ifeq ($(LAB),1)
 	git pull https://github.com/comp630-s24/jos.git main
+else ifeq ($(LAB),6)
+	git pull https://github.com/comp630-s24/jos.git lab6a
+else ifeq ($(LAB),8)
+	git pull https://github.com/comp630-s24/jos.git lab6b
 else
 	git pull https://github.com/comp630-s24/jos.git lab$(LAB)
 endif
