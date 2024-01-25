@@ -26,6 +26,7 @@ struct Command {
 static struct Command commands[] = {
 	{ "help", "Display this list of commands", mon_help },
 	{ "kerninfo", "Display information about the kernel", mon_kerninfo },
+	{ "backtrace", "backtrace", mon_backtrace },
 };
 #define NCOMMANDS (sizeof(commands)/sizeof(commands[0]))
 
@@ -60,7 +61,36 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
-	// Your code here.
+	uint64_t* rbp;
+	uint64_t* rip;
+	uint64_t size = (uint64_t)sizeof(struct Ripdebuginfo);
+
+	struct Ripdebuginfo* info; 
+	__asm__ ("mov 4(%%rsp), %0;" : "=r"(info));
+	__asm__ ("sub %0, %%rsp" : : "r"(size));
+
+
+
+	cprintf("Stack backtrace:\n");
+	__asm__ ("mov %%rbp, %0;" : "=r"(rbp));
+	 __asm__ volatile (
+        "call next_instr\n"
+        "next_instr:\n"
+        " pop %0\n"
+        : "=r"(rip)
+        :
+        : 
+    );
+	while(rbp){
+		cprintf("  rbp %016llx  rip %016llx\n", rbp, rip);
+		debuginfo_rip((uintptr_t)rip, info);
+		cprintf("      %s:%d: %s+%016llx  args: %d  \n", info->rip_file, info->rip_line 
+		, info->rip_fn_name
+		,(uint64_t)rip - (uint64_t)info->rip_fn_addr, info->rip_fn_narg);\
+		rip = (uint64_t*) *(rbp+1);
+		rbp = (uint64_t*) *(rbp);
+	}
+
 	return 0;
 }
 
