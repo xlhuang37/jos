@@ -216,8 +216,22 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
+    int alloc_npage = (n + PGSIZE - 1) / PGSIZE;
+    if(alloc_npage * PGSIZE + (unsigned long long) nextfree > npages * PGSIZE + KERNBASE){
+        panic("Not Enough Pages: reached %llx but the limit is %llx", (unsigned long long) alloc_npage * PGSIZE + nextfree, (unsigned long long) npages * PGSIZE + KERNBASE);
+    }
+    else{
+        if(n > 0){
+            result = nextfree;
+            nextfree += alloc_npage * PGSIZE;
+        }
+        else{
+            result = nextfree;
+        }
+    }
 
-	return NULL;
+
+    return result;
 }
 
 // Set up a four-level page table:
@@ -253,6 +267,7 @@ x64_vm_init(void)
 	// each physical page, there is a corresponding struct PageInfo in this
 	// array.  'npages' is the number of physical pages in memory.
 	// Your code goes here:
+	pages = boot_alloc(sizeof(struct PageInfo) * npages);
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -270,6 +285,7 @@ x64_vm_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
+	
 
 
 	//////////////////////////////////////////////////////////////////////
@@ -341,17 +357,27 @@ page_init(void)
 	// NB: Make sure you preserve the direction in which your page_free_list 
 	// is constructed
 	// NB: Remember to mark the memory used for initial boot page table i.e (va>=BOOT_PAGE_TABLE_START && va < BOOT_PAGE_TABLE_END) as in-use (not free)
-	size_t i;
-	struct PageInfo* last = NULL;
-	for (i = 0; i < npages; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = NULL;
-		if(last)
-			last->pp_link = &pages[i];
-		else
-			page_free_list = &pages[i];
-		last = &pages[i];
-	}
+    size_t i;
+    struct PageInfo* last = NULL;
+    for (i = 0; i < npages; i++) {
+        void* upper_used = boot_alloc(0);
+        physaddr_t upper_used_npage = PADDR((long long unsigned int)upper_used)/PGSIZE;
+        assert((long long unsigned int)upper_used_npage/PGSIZE < npages);
+        if(i == 0 || (i >= IOPHYSMEM/PGSIZE && i < (long long unsigned int) upper_used_npage/PGSIZE)){
+            pages[i].pp_ref = 1;
+            pages[i].pp_link = NULL;
+        }
+        else{
+            pages[i].pp_ref = 0;
+            pages[i].pp_link = NULL;
+            if(last)
+                last->pp_link = &pages[i];
+            else
+                page_free_list = &pages[i];
+            last = &pages[i];
+        }
+    }
+
 }
 
 //
@@ -369,8 +395,14 @@ page_init(void)
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
-	// Fill this function in
-	return 0;
+    struct PageInfo* alloc_page = page_free_list;
+    page_free_list = page_free_list->pp_link;
+    alloc_page->pp_link = NULL;
+    physaddr_t alloc_pa = PADDR(page2kva(alloc_page));
+    if(alloc_flags & ALLOC_ZERO){
+        memset((void*)alloc_pa, '\0', 4096);
+    }
+    return alloc_page;
 }
 
 //
@@ -390,9 +422,14 @@ page_initpp(struct PageInfo *pp)
 void
 page_free(struct PageInfo *pp)
 {
-	// Fill this function in
-	// Hint: You may want to panic if pp->pp_ref is nonzero or
-	// pp->pp_link is not NULL.
+    if(pp->pp_ref != 0 || pp->pp_link != NULL){
+        panic("Error in page_free, here is pp->pp_ref: %d", pp->pp_ref);
+    }
+    else{
+        pp->pp_link = page_free_list;
+        page_free_list = pp;
+    }
+
 }
 
 //
