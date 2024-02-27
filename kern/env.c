@@ -120,16 +120,14 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
-	memset(envs, 0, PGSIZE)；
-	struct Env * prev_env = env_free_list;
+	memset(envs, 0, PGSIZE);
+	struct Env * prev_env = envs;
+	prev_env->env_id = 1;
 	struct Env * curr_env;
-	for(int i = 0; i < NENV; i++){
-		struct env* curr_pointer = env + i;
-		long long unsigned int curr_val = (long long unsigned int) env;
-		assert((long long unsigned int ) curr_pointer != env + 1);
-		curr_pointer.env_id = (i + 1); // id 0 is reserved
+	for(int i = 1; i < NENV; i++){
 		if(i != 0){
-			curr_env = env + 1;
+			curr_env = envs + i;
+			curr_env->env_id = i + 1;
 			prev_env->env_link = curr_env;
 			prev_env = curr_env;
 		}
@@ -200,8 +198,8 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
-	memcpy(p, pml4e_t, PGSIZE);
-	e->env_pml4e = p;
+	e->env_pml4e = page2kva(p);
+	e->env_pml4e[1] = boot_pml4e[1];
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -291,11 +289,12 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
-	void* lower_bound = ROUNDDOWN(va, PGSIZE);
-	void* upper_bound = ROUNDUP(va + len, PGSIZE);
-	for(int i = lower_bound; i < upper_bound; i += PGSIZE){
-		if(!struct page_info* new_page = page_alloc(0)){panic("Memory Allocation Failure in Region Alloc")};
-		page_insert(e->env_pml4e, new_page, i, PTE_W | PTE_U | PTE_P)
+	int64_t lower_bound = ROUNDDOWN((int64_t)va, PGSIZE);
+	int64_t upper_bound = ROUNDUP((int64_t)(va + len), PGSIZE);
+	for(int64_t i = lower_bound; i < upper_bound; i += PGSIZE){
+		struct PageInfo* new_page = page_alloc(0);
+		if(!new_page){panic("Memory Allocation Failure in Region Alloc");};
+		page_insert(e->env_pml4e, new_page, (void*) i, PTE_W | PTE_U | PTE_P);
 	}
 }
 
@@ -325,15 +324,15 @@ void
 load_icode(struct Env *e, uint8_t *binary)
 {
 	// Hints:
-	//  Load each program segment into virtual memory
-	//  at the address specified in the ELF section header.
-	//  You should only load segments with ph->p_type == ELF_PROG_LOAD.
-	//  Each segment's virtual address can be found in ph->p_va
-	//  and its size in memory can be found in ph->p_memsz.
-	//  The ph->p_filesz bytes from the ELF binary, starting at
-	//  'binary + ph->p_offset', should be copied to virtual address
-	//  ph->p_va.  Any remaining memory bytes should be cleared to zero.
-	//  (The ELF header should have ph->p_filesz <= ph->p_memsz.)
+	//  DONE Load each program segment into virtual memory
+	//  DONE at the address specified in the ELF section header.
+	//  DONE You should only load segments with ph->p_type == ELF_PROG_LOAD.
+	//  DONE Each segment's virtual address can be found in ph->p_va
+	//  DONE and its size in memory can be found in ph->p_memsz.
+	//  DONE The ph->p_filesz bytes from the ELF binary, starting at
+	//  DONE 'binary + ph->p_offset', should be copied to virtual address
+	//  DONE ph->p_va.  Any remaining memory bytes should be cleared to zero.
+	//  DONE (The ELF header should have ph->p_filesz <= ph->p_memsz.)
 	//  Use functions from the previous lab to allocate and map pages.
 	//
 	//  All page protection bits should be user read/write for now.
@@ -352,12 +351,23 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  to make sure that the environment starts executing there.
 	//  What?  (See env_run() and env_pop_tf() below.)
 
-	// LAB 3: Your code here
+	// LAB 3: Your code hered
 	// Now map one page for the program's initial stack
 	// at virtual address USTACKTOP - PGSIZE.
 
 	// LAB 3: Your code here.
 	e->elf = binary;
+	struct Elf* elf = (struct Elf*) binary;
+	struct Secthdr* secthdr_table = (struct Secthdr*) (binary + elf->e_shoff); // size is in bytes so should be correct.
+	struct Proghdr* proghdr_table = (struct Proghdr*) (binary + elf->e_phoff); // size is in bytes so should be correct.
+	for(int i = 0; i < elf->e_phnum; i++){
+		struct Proghdr curr_proghdr = proghdr_table[i];
+		if(curr_proghdr.p_type == ELF_PROG_LOAD){
+			region_alloc(e, (void*)curr_proghdr.p_va, curr_proghdr.p_memsz);
+			memset((void*)curr_proghdr.p_va, 0, curr_proghdr.p_memsz);
+			memcpy((void*)curr_proghdr.p_va, binary + (size_t) curr_proghdr.p_offset, curr_proghdr.p_filesz);
+		}
+	}
 }
 
 //
@@ -370,7 +380,8 @@ load_icode(struct Env *e, uint8_t *binary)
 void
 env_create(uint8_t *binary, enum EnvType type)
 {
-	// LAB 3: Your code here.
+	struct Env* new_env; 
+	env_alloc(&new_env, 0);
 }
 
 //
