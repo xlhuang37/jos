@@ -120,7 +120,21 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+	memset(envs, 0, PGSIZE)；
+	struct Env * prev_env = env_free_list;
+	struct Env * curr_env;
+	for(int i = 0; i < NENV; i++){
+		struct env* curr_pointer = env + i;
+		long long unsigned int curr_val = (long long unsigned int) env;
+		assert((long long unsigned int ) curr_pointer != env + 1);
+		curr_pointer.env_id = (i + 1); // id 0 is reserved
+		if(i != 0){
+			curr_env = env + 1;
+			prev_env->env_link = curr_env;
+			prev_env = curr_env;
+		}
 
+	}
 	// Per-CPU part of the initialization
 	env_init_percpu();
 }
@@ -186,6 +200,8 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+	memcpy(p, pml4e_t, PGSIZE);
+	e->env_pml4e = p;
 
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
@@ -275,6 +291,12 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   'va' and 'len' values that are not page-aligned.
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
+	void* lower_bound = ROUNDDOWN(va, PGSIZE);
+	void* upper_bound = ROUNDUP(va + len, PGSIZE);
+	for(int i = lower_bound; i < upper_bound; i += PGSIZE){
+		if(!struct page_info* new_page = page_alloc(0)){panic("Memory Allocation Failure in Region Alloc")};
+		page_insert(e->env_pml4e, new_page, i, PTE_W | PTE_U | PTE_P)
+	}
 }
 
 //

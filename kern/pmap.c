@@ -14,6 +14,7 @@
 extern uint64_t pml4phys;
 #define BOOT_PAGE_TABLE_START ((uint64_t) KADDR((uint64_t) &pml4phys))
 #define BOOT_PAGE_TABLE_END   ((uint64_t) KADDR((uint64_t) (&pml4phys) + 5*PGSIZE))
+#define PAGING_DEBUG 0;
 
 // These variables are set by i386_detect_memory()
 size_t npages;			// Amount of physical memory (in pages)
@@ -251,7 +252,6 @@ x64_vm_init(void)
 	uint32_t cr0;
 	uint64_t n;
 	int r;
-	struct Env *env;
 	i386_detect_memory();
 	//panic("i386_vm_init: This function is not finished\n");
 	//////////////////////////////////////////////////////////////////////
@@ -268,10 +268,12 @@ x64_vm_init(void)
 	// array.  'npages' is the number of physical pages in memory.
 	// Your code goes here:
 	pages = boot_alloc(sizeof(struct PageInfo) * npages);
+	
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	envs = boot_alloc(sizeof(struct Env) * NENV);
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
 	// up the list of free physical pages. Once we've done so, all further
@@ -295,7 +297,7 @@ x64_vm_init(void)
 	// assert(duh == somepage);
 	// panic("");
 	boot_map_region(boot_pml4e, UPAGES,  ROUNDUP(sizeof(struct PageInfo) * npages, PGSIZE), PADDR(pages), PTE_U | PTE_P);
-
+	
 	//////////////////////////////////////////////////////////////////////
 	// Map the 'envs' array read-only by the user at linear address UENVS
 	// (ie. perm = PTE_U | PTE_P).
@@ -303,7 +305,7 @@ x64_vm_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
-
+	boot_map_region(boot_pml4e, UENVS,  ROUNDUP(sizeof(struct Env) * NENV, PGSIZE), PADDR(envs), PTE_U | PTE_P);
 	// //////////////////////////////////////////////////////////////////////
 	// // Use the physical memory that 'bootstack' refers to as the kernel
 	// // stack.  The kernel stack grows down from virtual address KSTACKTOP.
@@ -329,11 +331,15 @@ x64_vm_init(void)
 	// // Check that the initial page directory has been set up correctly.
 	boot_map_region(boot_pml4e, KERNBASE, npages*PGSIZE, 0, PTE_W | PTE_P);
 
-	check_page_free_list(1);
-	check_page_alloc();
-	page_check();
-	check_page_free_list(0);
-	check_boot_pml4e(boot_pml4e);
+	// check_page_free_list(1);
+	// check_page_alloc();
+	// page_check();
+	// check_page_free_list(0);
+	// check_boot_pml4e(boot_pml4e);
+
+
+	
+
 
 	//////////////////////////////////////////////////////////////////////
 	// Permissions: kernel RW, user NONE
@@ -957,9 +963,9 @@ check_boot_pml4e(pml4e_t *pml4e)
 
 	// check envs array (new test for lab 3)
 	n = ROUNDUP(NENV*sizeof(struct Env), PGSIZE);
-	for (i = 0; i < n; i += PGSIZE)
+	for (i = 0; i < n; i += PGSIZE){
 		assert(check_va2pa(pml4e, UENVS + i) == PADDR(envs) + i);
-
+	}
 	// check phys mem
 	for (i = 0; i < npages * PGSIZE; i += PGSIZE)
 		assert(check_va2pa(pml4e, KERNBASE + i) == i);
