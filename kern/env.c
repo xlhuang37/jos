@@ -120,6 +120,7 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
+	// After setting up page table, memset should be working now.
 	memset(envs, 0, PGSIZE);
 	struct Env * prev_env = envs;
 	prev_env->env_id = 1;
@@ -333,19 +334,17 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  DONE 'binary + ph->p_offset', should be copied to virtual address
 	//  DONE ph->p_va.  Any remaining memory bytes should be cleared to zero.
 	//  DONE (The ELF header should have ph->p_filesz <= ph->p_memsz.)
-	//  Use functions from the previous lab to allocate and map pages.
+	//  DONE Use functions from the previous lab to allocate and map pages.
 	//
-	//  All page protection bits should be user read/write for now.
-	//  ELF segments are not necessarily page-aligned, but you can
-	//  assume for this function that no two segments will touch
-	//  the same virtual page.
+	//  DONE All page protection bits should be user read/write for now.
+	//  DONE ELF segments are not necessarily page-aligned, but you can
+	//  DONE assume for this function that no two segments will touch
+	//  DONE the same virtual page.
 	//
-	//  You may find a function like region_alloc useful.
-	//
-	//  Loading the segments is much simpler if you can move data
-	//  directly into the virtual addresses stored in the ELF binary.
-	//  So which page directory should be in force during
-	//  this function?
+	//  DONE Loading the segments is much simpler if you can move data
+	//  DONE directly into the virtual addresses stored in the ELF binary.
+	//  DONE So which page directory should be in force during
+	//  DONE this function?
 	//
 	//  You must also do something with the program's entry point,
 	//  to make sure that the environment starts executing there.
@@ -360,6 +359,9 @@ load_icode(struct Env *e, uint8_t *binary)
 	struct Elf* elf = (struct Elf*) binary;
 	struct Secthdr* secthdr_table = (struct Secthdr*) (binary + elf->e_shoff); // size is in bytes so should be correct.
 	struct Proghdr* proghdr_table = (struct Proghdr*) (binary + elf->e_phoff); // size is in bytes so should be correct.
+	
+	uint64_t curr_cr3 = rcr3();
+	lcr3(e->env_cr3);
 	for(int i = 0; i < elf->e_phnum; i++){
 		struct Proghdr curr_proghdr = proghdr_table[i];
 		if(curr_proghdr.p_type == ELF_PROG_LOAD){
@@ -368,6 +370,8 @@ load_icode(struct Env *e, uint8_t *binary)
 			memcpy((void*)curr_proghdr.p_va, binary + (size_t) curr_proghdr.p_offset, curr_proghdr.p_filesz);
 		}
 	}
+	lcr3(curr_cr3);
+	e->env_cr3 = elf->e_entry;
 }
 
 //
@@ -381,7 +385,11 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	struct Env* new_env; 
-	env_alloc(&new_env, 0);
+	int r = env_alloc(&new_env, 0);
+	if(r){panic("env_create error %e", r);};
+	cprintf("before loading icode");
+	load_icode(new_env, binary);
+	cprintf("after loading icode");
 }
 
 //
@@ -519,7 +527,17 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-
-	panic("env_run not yet implemented");
+	if(curenv){
+		if(curenv->env_status == ENV_RUNNING){
+			curenv->env_status = ENV_RUNNABLE;
+		}
+		curenv = e;
+	} else{
+		curenv = e;
+	}
+	curenv->env_status = ENV_RUNNING;
+	curenv->env_runs += 1;
+	lcr3(curenv->env_cr3);
+	panic("");
 }
 

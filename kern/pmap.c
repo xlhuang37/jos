@@ -258,9 +258,10 @@ x64_vm_init(void)
 	// create initial page directory.
 	// panic("x64_vm_init: this function is not finished\n");
 	pml4e = boot_alloc(PGSIZE);
-	memset(pml4e, 0, PGSIZE);
+	cprintf("pml4e is %llx\n", pml4e);
 	boot_pml4e = pml4e;
 	boot_cr3 = PADDR(pml4e);
+	memset((void*)boot_cr3, 0, PGSIZE);
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct PageInfo's and store it in 'pages'.
 	// The kernel uses this array to keep track of physical pages: for
@@ -331,11 +332,11 @@ x64_vm_init(void)
 	// // Check that the initial page directory has been set up correctly.
 	boot_map_region(boot_pml4e, KERNBASE, npages*PGSIZE, 0, PTE_W | PTE_P);
 
-	// check_page_free_list(1);
-	// check_page_alloc();
-	// page_check();
-	// check_page_free_list(0);
-	// check_boot_pml4e(boot_pml4e);
+	check_page_free_list(1);
+	check_page_alloc();
+	page_check();
+	check_page_free_list(0);
+	check_boot_pml4e(boot_pml4e);
 
 
 	
