@@ -3,13 +3,15 @@
 #ifndef JOS_KERN_PMAP_H
 #define JOS_KERN_PMAP_H
 #ifndef JOS_KERNEL
-# error "This is a JOS kernel header; user programs should not #include it"
+#error "This is a JOS kernel header; user programs should not #include it"
 #endif
 
 #include <inc/memlayout.h>
 #include <inc/assert.h>
-struct Env;
+#include <kern/monitor.h>
 
+
+struct Env;
 extern char bootstacktop[], bootstack[];
 
 extern struct PageInfo *pages;
