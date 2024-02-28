@@ -42,7 +42,6 @@ i386_init(void)
 
 	// Lab 2 memory management initialization functions
 	x64_vm_init();
-
 	// Lab 3 user environment initialization functions
 	env_init();
 	trap_init();

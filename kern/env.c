@@ -120,10 +120,12 @@ env_init(void)
 {
 	// Set up envs array
 	// LAB 3: Your code here.
-	// After setting up page table, memset should be working now.
+
+
 	memset(envs, 0, PGSIZE);
 	struct Env * prev_env = envs;
 	prev_env->env_id = 1;
+	env_free_list = prev_env;
 	struct Env * curr_env;
 	for(int i = 1; i < NENV; i++){
 		if(i != 0){
@@ -134,8 +136,10 @@ env_init(void)
 		}
 
 	}
+	
 	// Per-CPU part of the initialization
 	env_init_percpu();
+	cprintf("are we here?\n");
 }
 
 // Load GDT and segment descriptors.
@@ -178,8 +182,10 @@ env_setup_vm(struct Env *e)
 	struct PageInfo *p = NULL;
 
 	// Allocate a page for the page directory
-	if (!(p = page_alloc(ALLOC_ZERO)))
-		return -E_NO_MEM;
+	cprintf("185\n");
+	p = page_alloc(ALLOC_ZERO);
+	if (!p){panic("%e\n", p);}
+		
 
 	// Now, set e->env_pml4e and initialize the page directory.
 	//
@@ -199,9 +205,10 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+	cprintf("185\n");
 	e->env_pml4e = page2kva(p);
 	e->env_pml4e[1] = boot_pml4e[1];
-
+	cprintf("185\n");
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pml4e[PML4(UVPT)] = e->env_cr3 | PTE_P | PTE_U;
@@ -224,7 +231,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	int32_t generation;
 	int r;
 	struct Env *e;
-
+	cprintf("231\n");
 	if (!(e = env_free_list))
 		return -E_NO_FREE_ENV;
 
@@ -351,9 +358,12 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code hered
-	// Now map one page for the program's initial stack
-	// at virtual address USTACKTOP - PGSIZE.
-
+	// DONE Now map one page for the program's initial stack
+	// DONE at virtual address USTACKTOP - PGSIZE.
+	panic("");
+	struct PageInfo* stackPage = page_alloc(0);
+	if(!stackPage){panic("Page Alloc Error in load_inode\n");}
+	page_insert(e->env_pml4e, stackPage, (void*)(USTACKTOP - PGSIZE), PTE_W | PTE_U | PTE_P);
 	// LAB 3: Your code here.
 	e->elf = binary;
 	struct Elf* elf = (struct Elf*) binary;
@@ -371,7 +381,7 @@ load_icode(struct Env *e, uint8_t *binary)
 		}
 	}
 	lcr3(curr_cr3);
-	e->env_cr3 = elf->e_entry;
+	e->env_tf.tf_rip = elf->e_entry;
 }
 
 //
@@ -384,9 +394,9 @@ load_icode(struct Env *e, uint8_t *binary)
 void
 env_create(uint8_t *binary, enum EnvType type)
 {
-	struct Env* new_env; 
+	struct Env* new_env;
 	int r = env_alloc(&new_env, 0);
-	if(r){panic("env_create error %e", r);};
+	if(r!=0){panic("env_create error %e", r);};
 	cprintf("before loading icode");
 	load_icode(new_env, binary);
 	cprintf("after loading icode");
@@ -538,6 +548,7 @@ env_run(struct Env *e)
 	curenv->env_status = ENV_RUNNING;
 	curenv->env_runs += 1;
 	lcr3(curenv->env_cr3);
+	env_pop_tf(&(curenv->env_tf));
 	panic("");
 }
 

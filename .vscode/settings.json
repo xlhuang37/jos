@@ -2,7 +2,8 @@
     "files.associations": {
         "assert.h": "c",
         "memlayout.h": "c",
-        "env.h": "c"
+        "env.h": "c",
+        "monitor.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
