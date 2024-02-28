@@ -129,12 +129,10 @@ env_init(void)
 	struct Env * curr_env;
 	for(int i = 1; i < NENV; i++){
 		if(i != 0){
-			curr_env = envs + i;
-			curr_env->env_id = i + 1;
+			curr_env = envs + (size_t)i;
 			prev_env->env_link = curr_env;
 			prev_env = curr_env;
 		}
-
 	}
 	
 	// Per-CPU part of the initialization
@@ -360,7 +358,6 @@ load_icode(struct Env *e, uint8_t *binary)
 	// LAB 3: Your code hered
 	// DONE Now map one page for the program's initial stack
 	// DONE at virtual address USTACKTOP - PGSIZE.
-	panic("");
 	struct PageInfo* stackPage = page_alloc(0);
 	if(!stackPage){panic("Page Alloc Error in load_inode\n");}
 	page_insert(e->env_pml4e, stackPage, (void*)(USTACKTOP - PGSIZE), PTE_W | PTE_U | PTE_P);
@@ -369,9 +366,10 @@ load_icode(struct Env *e, uint8_t *binary)
 	struct Elf* elf = (struct Elf*) binary;
 	struct Secthdr* secthdr_table = (struct Secthdr*) (binary + elf->e_shoff); // size is in bytes so should be correct.
 	struct Proghdr* proghdr_table = (struct Proghdr*) (binary + elf->e_phoff); // size is in bytes so should be correct.
-	
+	cprintf("duh\n");
 	uint64_t curr_cr3 = rcr3();
 	lcr3(e->env_cr3);
+	cprintf("duh\n");
 	for(int i = 0; i < elf->e_phnum; i++){
 		struct Proghdr curr_proghdr = proghdr_table[i];
 		if(curr_proghdr.p_type == ELF_PROG_LOAD){
