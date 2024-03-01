@@ -2,7 +2,7 @@
 
 #include <inc/lib.h>
 
-#define ARRAYSIZE (200)
+#define ARRAYSIZE (1024*1024)
 
 uint32_t bigarray[ARRAYSIZE];
 
