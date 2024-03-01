@@ -260,8 +260,8 @@ x64_vm_init(void)
 	pml4e = boot_alloc(PGSIZE);
 	boot_pml4e = pml4e;
 	boot_cr3 = PADDR(pml4e);
-	cprintf("boot_cr3 is %llx\n", boot_cr3);
-	memset((void*)boot_cr3, 0, PGSIZE);
+
+	memset((void*)boot_pml4e, 0, PGSIZE);
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct PageInfo's and store it in 'pages'.
 	// The kernel uses this array to keep track of physical pages: for
@@ -269,12 +269,14 @@ x64_vm_init(void)
 	// array.  'npages' is the number of physical pages in memory.
 	// Your code goes here:
 	pages = boot_alloc(sizeof(struct PageInfo) * npages);
+	memset((void*)pages, 0, sizeof(struct PageInfo) * npages);
 	
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
 	envs = boot_alloc(sizeof(struct Env) * NENV);
+	memset((void*)envs, 0, sizeof(struct Env) * NENV);
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
 	// up the list of free physical pages. Once we've done so, all further
@@ -438,13 +440,12 @@ page_alloc(int alloc_flags)
 	if(page_free_list == NULL){return NULL;}
 
     struct PageInfo* alloc_page = page_free_list;
-	cprintf("%llx\n", page2kva(alloc_page));
     page_free_list = page_free_list->pp_link;
     alloc_page->pp_link = NULL;
-    physaddr_t alloc_pa = (page2pa(alloc_page));
-    // if(alloc_flags & ALLOC_ZERO){
-    //     memset((void*)alloc_pa, '\0', 4096);
-    // }
+    void* alloc_kva = (page2kva(alloc_page));
+    if(alloc_flags & ALLOC_ZERO){
+        memset((void*)alloc_kva, '\0', 4096);
+    }
     return alloc_page;
 }
 
@@ -700,11 +701,15 @@ page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store)
 {
 	int create = false;
 	pte_t* page_table = pml4e_walk(pml4e, va, create);
-	pte_t pte = *(page_table);
-	if(!pte || !page_table){
+	
+	if(!page_table){
 		return NULL;
 	}
 	else{
+		pte_t pte = *(page_table);
+		if((pte & PTE_P) == 0){
+			return NULL;
+		}
 		assert(pte >> 40 == 0);
 		struct PageInfo* page = pa2page(PTE_ADDR(pte));
 		if(!pte_store){
@@ -780,6 +785,18 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	int64_t lower_bound = ROUNDDOWN((int64_t)va, PGSIZE);
+	int64_t upper_bound = ROUNDUP((int64_t)(va + len), PGSIZE);
+	struct PageInfo* page;
+	for(int64_t i = lower_bound; i < upper_bound; i += PGSIZE){
+		void* pt_i = (void*)i;
+		page = page_lookup(env->env_pml4e, (void*)pt_i, NULL);
+		bool lowerThanULIM = (i < ULIM);
+		if(!page || !lowerThanULIM){
+			user_mem_check_addr = MAX(i, (int64_t)va);
+			return -E_FAULT;
+		}
+	}
 	return 0;
 
 }
@@ -1022,27 +1039,27 @@ check_va2pa(pml4e_t *pml4e, uintptr_t va)
 	pte_t *pte;
 	pdpe_t *pdpe;
 	pde_t *pde;
-	cprintf("va2pa\n");
-	cprintf("%x", va);
+	// cprintf("va2pa\n");
+	// cprintf("%x", va);
 	pml4e = &pml4e[PML4(va)];
-	cprintf(" %x %x " , PML4(va), *pml4e);
+	// cprintf(" %x %x " , PML4(va), *pml4e);
 	if(!(*pml4e & PTE_P))
 		return ~0;
 	pdpe = (pdpe_t *) KADDR(PTE_ADDR(*pml4e));
-	cprintf(" %x %x " , pdpe, *pdpe);
+	// cprintf(" %x %x " , pdpe, *pdpe);
 	if (!(pdpe[PDPE(va)] & PTE_P))
 		return ~0;
 	pde = (pde_t *) KADDR(PTE_ADDR(pdpe[PDPE(va)]));
 	pde = &pde[PDX(va)];
-	cprintf(" %x %x " , pde, *pde);
+	// cprintf(" %x %x " , pde, *pde);
 	if (!(*pde & PTE_P))
 		return ~0;
 	pte = (pte_t*) KADDR(PTE_ADDR(*pde));
 	pte_t* pte_r = &pte[PTX(va)];
-	cprintf(" %x %x " , pte_r, *pte_r);
+	// cprintf(" %x %x " , pte_r, *pte_r);
 	if (!(pte[PTX(va)] & PTE_P))
 		return ~0;
-	cprintf(" %x %x\n" , PTX(va),  PTE_ADDR(pte[PTX(va)]));
+	// cprintf(" %x %x\n" , PTX(va),  PTE_ADDR(pte[PTX(va)]));
 	return PTE_ADDR(pte[PTX(va)]);
 }
 

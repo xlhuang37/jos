@@ -13,7 +13,6 @@ extern uintptr_t gdtdesc_64;
 struct Taskstate ts;
 extern struct Segdesc gdt[];
 extern long gdt_pd;
-
 /* For debugging, so print_trapframe can distinguish between printing
  * a saved trapframe and printing the current trapframe and print some
  * additional information in the latter case.
@@ -26,6 +25,55 @@ static struct Trapframe *last_tf;
 struct Gatedesc idt[256] = { { 0 } };
 struct Pseudodesc idt_pd = {0,0};
 
+extern void handler_0();
+extern void handler_1();
+extern void handler_2();
+extern void handler_3();
+extern void handler_4();
+extern void handler_5();
+extern void handler_6();
+extern void handler_7();
+extern void handler_8();
+extern void handler_9();
+extern void handler_10();
+extern void handler_11();
+extern void handler_12();
+extern void handler_13();
+extern void handler_14();
+extern void handler_15();
+extern void handler_16();
+extern void handler_17();
+extern void handler_18();
+extern void handler_19();
+extern void handler_20();
+extern void handler_21();
+extern void handler_22();
+extern void handler_23();
+extern void handler_24();
+extern void handler_25();
+extern void handler_26();
+extern void handler_27();
+extern void handler_28();
+extern void handler_29();
+extern void handler_30();
+extern void handler_31();
+extern void handler_32();
+extern void handler_33();
+extern void handler_34();
+extern void handler_35();
+extern void handler_36();
+extern void handler_37();
+extern void handler_38();
+extern void handler_39();
+extern void handler_40();
+extern void handler_41();
+extern void handler_42();
+extern void handler_43();
+extern void handler_44();
+extern void handler_45();
+extern void handler_46();
+extern void handler_47();
+extern void handler_48();
 
 static const char *trapname(int trapno)
 {
@@ -60,6 +108,7 @@ static const char *trapname(int trapno)
 }
 
 
+
 void
 trap_init(void)
 {
@@ -68,6 +117,59 @@ trap_init(void)
 	// LAB 3: Your code here.
 	idt_pd.pd_lim = sizeof(idt)-1;
 	idt_pd.pd_base = (uint64_t)idt;
+	SETGATE(idt[0], 0, GD_KT, &handler_0, 0);
+	SETGATE(idt[1], 0, GD_KT, &handler_1, 0);
+	SETGATE(idt[2], 0, GD_KT, &handler_2, 0);
+	SETGATE(idt[3], 0, GD_KT, &handler_3, 3); // BREAKPOINT
+	SETGATE(idt[4], 0, GD_KT, &handler_4, 0);
+	SETGATE(idt[5], 0, GD_KT, &handler_5, 0);
+	SETGATE(idt[6], 0, GD_KT, &handler_6, 0);
+	SETGATE(idt[7], 0, GD_KT, &handler_7, 0);
+	SETGATE(idt[8], 0, GD_KT, &handler_8, 0);
+	SETGATE(idt[9], 0, GD_KT, &handler_9, 0);
+	SETGATE(idt[10], 0, GD_KT, &handler_10, 0);
+	SETGATE(idt[11], 0, GD_KT, &handler_11, 0);
+	SETGATE(idt[12], 0, GD_KT, &handler_12, 0);
+	SETGATE(idt[13], 0, GD_KT, &handler_13, 0);
+	SETGATE(idt[14], 0, GD_KT, &handler_14, 0);
+	SETGATE(idt[15], 0, GD_KT, &handler_15, 0);
+	SETGATE(idt[16], 0, GD_KT, &handler_16, 0);
+	SETGATE(idt[17], 0, GD_KT, &handler_17, 0);
+	SETGATE(idt[18], 0, GD_KT, &handler_18, 0);
+	SETGATE(idt[19], 0, GD_KT, &handler_19, 0);
+	SETGATE(idt[20], 0, GD_KT, &handler_20, 0);
+	SETGATE(idt[21], 0, GD_KT, &handler_21, 0);
+	SETGATE(idt[22], 0, GD_KT, &handler_22, 0);
+	SETGATE(idt[23], 0, GD_KT, &handler_23, 0);
+	SETGATE(idt[24], 0, GD_KT, &handler_24, 0);
+	SETGATE(idt[25], 0, GD_KT, &handler_25, 0);
+	SETGATE(idt[26], 0, GD_KT, &handler_26, 0);
+	SETGATE(idt[27], 0, GD_KT, &handler_27, 0);
+	SETGATE(idt[28], 0, GD_KT, &handler_28, 0);
+	SETGATE(idt[29], 0, GD_KT, &handler_29, 0);
+	SETGATE(idt[30], 0, GD_KT, &handler_30, 0);
+	SETGATE(idt[31], 0, GD_KT, &handler_31, 0);
+	// Software
+	SETGATE(idt[32], 0, GD_KT, &handler_14, 3);
+	SETGATE(idt[33], 0, GD_KT, &handler_15, 3);
+	SETGATE(idt[34], 0, GD_KT, &handler_16, 3);
+	SETGATE(idt[35], 0, GD_KT, &handler_17, 3);
+	SETGATE(idt[36], 0, GD_KT, &handler_18, 3);
+	SETGATE(idt[37], 0, GD_KT, &handler_14, 3);
+	SETGATE(idt[38], 0, GD_KT, &handler_15, 3);
+	SETGATE(idt[39], 0, GD_KT, &handler_16, 3);
+	SETGATE(idt[40], 0, GD_KT, &handler_17, 3);
+	SETGATE(idt[41], 0, GD_KT, &handler_18, 3);	
+	SETGATE(idt[42], 0, GD_KT, &handler_14, 3);
+	SETGATE(idt[43], 0, GD_KT, &handler_15, 3);
+	SETGATE(idt[44], 0, GD_KT, &handler_16, 3);
+	SETGATE(idt[45], 0, GD_KT, &handler_17, 3);
+	SETGATE(idt[46], 0, GD_KT, &handler_18, 3);
+	SETGATE(idt[47], 0, GD_KT, &handler_18, 3);
+	// Syscall
+	SETGATE(idt[48], 0, GD_KT, &handler_48, 3);
+
+	// idt[0] = &handler_0;
 	// Per-CPU setup
 	trap_init_percpu();
 }
@@ -149,7 +251,24 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	print_trapframe(tf);
+	switch(tf->tf_trapno){
+		case T_DIVIDE: cprintf("\n\n\n\n"); break;
+		case T_PGFLT: page_fault_handler(tf); break;
+		case T_BRKPT: monitor(tf); return;
+		case T_SYSCALL: syscall(tf->tf_regs.reg_rax
+								, tf->tf_regs.reg_rdx
+								, tf->tf_regs.reg_rcx
+								, tf->tf_regs.reg_rbx
+								, tf->tf_regs.reg_rdi
+								, tf->tf_regs.reg_rsi); 
+								return;
+		default: break;
+	}
 
+	if(tf->tf_trapno == T_PGFLT){
+		page_fault_handler(tf);
+	}
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -163,6 +282,8 @@ trap_dispatch(struct Trapframe *tf)
 void
 trap(struct Trapframe *tf)
 {
+	cprintf("trapframe is %llx\n", tf);
+
 	//struct Trapframe *tf = &tf_;
 	// The environment may have set DF and some versions
 	// of GCC rely on DF being clear
@@ -186,7 +307,6 @@ trap(struct Trapframe *tf)
 		// The trapframe on the stack should be ignored from here on.
 		tf = &curenv->env_tf;
 	}
-
 	// Record that tf is the last real trapframe so
 	// print_trapframe can print some additional information.
 	last_tf = tf;
@@ -211,7 +331,8 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
-
+	if (tf->tf_cs == GD_KT)
+		panic("Page Fault in kernel: %llx\n", fault_va);
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 
