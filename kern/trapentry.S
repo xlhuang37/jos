@@ -42,6 +42,13 @@
 	pushq $num;							\
 	jmp _alltraps
 
+.section .data
+.global handlers
+
+
+
+
+
 .text
 
 /*
@@ -118,3 +125,53 @@ _alltraps:
 	mov %rsp, %rdi;
 	call trap;
 
+handlers:
+    .quad handler_0
+    .quad handler_1
+    .quad handler_2
+    .quad handler_3
+    .quad handler_4
+    .quad handler_5
+    .quad handler_6
+    .quad handler_7
+    .quad handler_8
+    .quad handler_9
+    .quad handler_10
+    .quad handler_11
+    .quad handler_12
+    .quad handler_13
+    .quad handler_14
+    .quad handler_15
+    .quad handler_16
+    .quad handler_17
+    .quad handler_18
+    .quad handler_19
+    .quad handler_20
+    .quad handler_21
+    .quad handler_22
+    .quad handler_23
+    .quad handler_24
+    .quad handler_25
+    .quad handler_26
+    .quad handler_27
+    .quad handler_28
+    .quad handler_29
+    .quad handler_30
+    .quad handler_31
+    .quad handler_32
+    .quad handler_33
+    .quad handler_34
+    .quad handler_35
+    .quad handler_36
+    .quad handler_37
+    .quad handler_38
+    .quad handler_39
+    .quad handler_40
+    .quad handler_41
+    .quad handler_42
+    .quad handler_43
+    .quad handler_44
+    .quad handler_45
+    .quad handler_46
+    .quad handler_47
+    .quad handler_48
