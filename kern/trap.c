@@ -18,7 +18,6 @@ extern uintptr_t gdtdesc_64;
 struct Taskstate ts;
 extern struct Segdesc gdt[];
 extern long gdt_pd;
-
 /* For debugging, so print_trapframe can distinguish between printing
  * a saved trapframe and printing the current trapframe and print some
  * additional information in the latter case.
@@ -31,6 +30,7 @@ static struct Trapframe *last_tf;
 struct Gatedesc idt[256] = { { 0 } };
 struct Pseudodesc idt_pd = {0,0};
 
+extern void (*handlers[])(void);
 
 static const char *trapname(int trapno)
 {
@@ -67,6 +67,7 @@ static const char *trapname(int trapno)
 }
 
 
+
 void
 trap_init(void)
 {
@@ -75,6 +76,14 @@ trap_init(void)
 	// LAB 3: Your code here.
 	idt_pd.pd_lim = sizeof(idt)-1;
 	idt_pd.pd_base = (uint64_t)idt;
+	for(int i = 0; i < 32; i++){
+		SETGATE(idt[i], i, GD_KT, handlers[i], 0);
+	}
+	SETGATE(idt[3], 3, GD_KT, handlers[3], 3); // Override permission for BREAKPOINT.
+	for(int i = 32; i < 49; i++){
+		SETGATE(idt[i], i, GD_KT, handlers[i], 3);
+	}
+
 	// Per-CPU setup
 	trap_init_percpu();
 }
@@ -206,6 +215,8 @@ trap_dispatch(struct Trapframe *tf)
 void
 trap(struct Trapframe *tf)
 {
+	cprintf("trapframe is %llx\n", tf);
+
 	//struct Trapframe *tf = &tf_;
 	// The environment may have set DF and some versions
 	// of GCC rely on DF being clear
@@ -246,7 +257,6 @@ trap(struct Trapframe *tf)
 		// The trapframe on the stack should be ignored from here on.
 		tf = &curenv->env_tf;
 	}
-
 	// Record that tf is the last real trapframe so
 	// print_trapframe can print some additional information.
 	last_tf = tf;
@@ -275,7 +285,8 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
-
+	if (tf->tf_cs == GD_KT)
+		panic("Page Fault in kernel: %llx\n", fault_va);
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 

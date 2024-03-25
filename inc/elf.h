@@ -3,6 +3,8 @@
 
 #define ELF_MAGIC 0x464C457FU	/* "\x7FELF" in little endian */
 
+// https://www.cs.unc.edu/~porter/courses/comp630/s24/ref/elf.pdf
+
 struct Elf {
 	uint32_t e_magic;	// must equal ELF_MAGIC
 	uint8_t e_elf[12];
