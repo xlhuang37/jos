@@ -341,11 +341,11 @@ x64_vm_init(void)
 	boot_map_region(boot_pml4e, KERNBASE, npages*PGSIZE, 0, 0x3);
 
 
-	// check_page_free_list(1);
-	// check_page_alloc();
-	// page_check();
-	// check_page_free_list(0);
-	// check_boot_pml4e(boot_pml4e);
+	check_page_free_list(1);
+	check_page_alloc();
+	page_check();
+	check_page_free_list(0);
+	check_boot_pml4e(boot_pml4e);
 
 
 
@@ -383,6 +383,13 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
+	for(int i = 0; i < NCPU; i++){
+		int64_t kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP);
+		if(kstacktop_i - (KSTKSIZE + KSTKGAP) < MMIOLIM){
+			panic("Mapped Too many kstacks: overflowing into MMIO region");
+		}
+		boot_map_region(boot_pml4e, kstacktop_i - KSTKSIZE, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W | PTE_P);
+	}
 
 }
 
@@ -438,6 +445,7 @@ page_init(void)
 		|| (i >= IOPHYSMEM_NPAGE && i <  EXTPHYSMEM_NPAGE) 
 		|| (i >= EXTPHYSMEM_NPAGE && i < upper_used_npage) 
 		|| (i >= PADDR(BOOT_PAGE_TABLE_START)/PGSIZE && i < (PADDR(BOOT_PAGE_TABLE_END)/PGSIZE))
+		|| ((i >= MPENTRY_PADDR) && i < MPENTRY_PADDR + PGSIZE)
 		)
 		{
             pages[i].pp_ref = 1;
@@ -516,8 +524,10 @@ page_free(struct PageInfo *pp)
 void
 page_decref(struct PageInfo* pp)
 {
-	if (--pp->pp_ref == 0)
+	if (--pp->pp_ref == 0){
 		page_free(pp);
+	}
+		
 }
 // Given a pml4 pointer, pml4e_walk returns a pointer
 // to the page table entry (PTE) for linear address 'va'
@@ -547,11 +557,16 @@ page_decref(struct PageInfo* pp)
 
 pte_t *
 pml4e_walk(pml4e_t *pml4e, const void *va, int create)
-{
+{	
+	if(pml4e == NULL){
+		cprintf("entering the pml4e with null value?!!\n");
+		cprintf("%llx\n", (int64_t)va);
+		cprintf("%llx\n", thiscpu->cpu_env->env_pml4e);
+	}
+	
 	pdpe_t* pml4e_entry = (pdpe_t*)*(pml4e + PML4(va));
 	if(!pml4e_entry){
 		if(!create){
-			cprintf("create is %d \n", create);
 			return NULL;
 		}
 		else{
@@ -658,11 +673,10 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pml4e_t *pml4e, uintptr_t la, size_t size, physaddr_t pa, int perm)
 {	
-	int create = true;
 	assert(size%PGSIZE == 0);
 	perm = (perm|PTE_P) & 0xFFF; // Make sure only lower 12 bits
 	for(long long unsigned int i = 0; i < size; i += PGSIZE){
-		pte_t* page_table = pml4e_walk(pml4e, (void *)((long long unsigned int)la + i), create);
+		pte_t* page_table = pml4e_walk(pml4e, (void *)((long long unsigned int)la + i), 1);
 		pte_t pte = pa + i + perm;
 		*(page_table) = pte;
 	}
@@ -699,8 +713,7 @@ page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
 	// Assuming that pp is from page_alloc()? 
     assert(pp->pp_link == NULL);
 	// Above is testing assumption that this function is called after page_alloc();
-	int create = 1;
-	pte_t* ptep = pml4e_walk(pml4e, va, create);
+	pte_t* ptep = pml4e_walk(pml4e, va, 1);
 	if(!ptep){return -E_NO_MEM;}
 	pte_t pte = *(ptep);
 	if(pte){
@@ -726,15 +739,14 @@ page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
 // can be used to verify page permissions for syscall arguments,
 // but should not be used by most callers.
 //
-// Return NULL if there is no page mapped at va.
+// Return NULL if there is no page mapped at va. In that case, pte_store will not be modified.
 //
 // Hint: the TA solution uses pml4e_walk and pa2page.
 //
 struct PageInfo *
 page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store)
 {
-	int create = false;
-	pte_t* page_table = pml4e_walk(pml4e, va, create);
+	pte_t* page_table = pml4e_walk(pml4e, va, 0);
 	
 	if(!page_table){
 		return NULL;
@@ -828,7 +840,14 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	if(size + base > MMIOLIM){
+		panic("mmio_map_region exceeds MMIOLIM");
+	}
+	boot_map_region(boot_pml4e, base,  ROUNDUP(size, PGSIZE), pa, PTE_P|PTE_W|PTE_PCD|PTE_PWT);
+	void* reserved_base =  (void*) base;
+	base += ROUNDUP(size, PGSIZE);
+
+	return (void*) reserved_base;
 }
 
 static uintptr_t user_mem_check_addr;
@@ -886,6 +905,17 @@ user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
 			"va %08x\n", env->env_id, user_mem_check_addr);
 		env_destroy(env);	// may not return
 	}
+}
+
+int
+user_mem_assert_nodestroy(struct Env *env, const void *va, size_t len, int perm)
+{
+	int r = user_mem_check(env, va, len, perm | PTE_U);
+	if (r < 0) {
+		cprintf("[%08x] user_mem_check assertion failure for "
+			"va %08x\n", env->env_id, user_mem_check_addr);
+	}
+	return r;
 }
 
 
@@ -952,6 +982,7 @@ check_page_free_list(bool only_low_memory)
 	}
 
 	assert(nfree_extmem > 0);
+	cprintf("check free list succeeded!\n");
 }
 
 

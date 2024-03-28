@@ -31,6 +31,41 @@ sched_yield(void)
 
 	// LAB 4: Your code here.
 	// sched_halt never returns
+	struct Env* next_env;
+	if(!curenv){
+		next_env = (struct Env*) envs;
+	} else {
+		curenv->env_status = ENV_RUNNABLE;
+		next_env = curenv + (size_t) 1;
+	}
+	
+	while(next_env < envs + (size_t) NENV){
+		if(next_env->env_status == ENV_RUNNABLE){
+			cprintf("before env run\n");
+			cprintf("the env pml4e is %llx\n", next_env->env_pml4e);
+			env_run(next_env);
+			panic("env run returned?");
+		}
+		next_env = next_env + (size_t) 1;
+	}
+	next_env = envs;
+	while(next_env < curenv){
+		if(next_env->env_status == ENV_RUNNABLE){
+						cprintf("before env run\n");
+			cprintf("the env pml4e is %llx\n", next_env->env_pml4e);
+			env_run(next_env);
+			panic("env run returned?");
+		}
+		next_env = next_env + (size_t) 1;
+	}
+	if(curenv != NULL){
+		if(curenv->env_status == ENV_RUNNABLE){
+						cprintf("before env run\n");
+			cprintf("the env pml4e is %llx\n", next_env->env_pml4e);
+			env_run(curenv);
+			panic("env run returned?");
+		}
+	}
 	sched_halt();
 }
 
@@ -42,6 +77,7 @@ sched_yield(void)
 void
 sched_halt(void)
 {
+	cprintf("CPU %d halting!\n", thiscpu->cpu_id);
 	int i;
 
 	// For debugging and testing purposes, if there are no runnable

@@ -130,11 +130,13 @@ env_init(void)
 	struct Env * prev_env = envs;
 	env_free_list = prev_env;
 	prev_env->env_id = 0;
+	prev_env->env_link = NULL;
 	struct Env * curr_env;
 	for(int i = 1; i < NENV; i++){
 		if(i != 0){
 			curr_env->env_id = 0;
 			curr_env = envs + (size_t)i;
+			curr_env->env_link = NULL; 
 			prev_env->env_link = curr_env;
 			prev_env = curr_env;
 		}
@@ -206,12 +208,15 @@ env_setup_vm(struct Env *e)
 	//    - The functions in kern/pmap.h are handy.
 
 	// LAB 3: Your code here.
+	p->pp_ref += 1;
+	
 	e->env_pml4e = page2kva(p);
 	e->env_cr3 = page2pa(p);
 	e->env_pml4e[1] = boot_pml4e[1];
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
-	e->env_pml4e[PML4(UVPT)] = e->env_cr3 | PTE_P | PTE_U;
+	page_insert(e->env_pml4e, p, (void*) UVPT, PTE_P|PTE_U);
+
 
 	return 0;
 }
@@ -231,7 +236,6 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	int32_t generation;
 	int r;
 	struct Env *e;
-	cprintf("231\n");
 	if (!(e = env_free_list))
 		return -E_NO_FREE_ENV;
 
@@ -284,7 +288,6 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// commit the allocation
 	env_free_list = e->env_link;
 	*newenv_store = e;
-
 	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 	return 0;
 }
@@ -309,7 +312,7 @@ region_alloc(struct Env *e, void *va, size_t len)
 	int64_t lower_bound = ROUNDDOWN((int64_t)va, PGSIZE);
 	int64_t upper_bound = ROUNDUP((int64_t)(va + len), PGSIZE);
 	for(int64_t i = lower_bound; i < upper_bound; i += PGSIZE){
-		struct PageInfo* page_at_i = page_lookup(e->env_pml4e, (void*) i, 0);
+		struct PageInfo* page_at_i = page_lookup(e->env_pml4e, (void*) i, NULL);
 		if(!page_at_i){
 			struct PageInfo* new_page = page_alloc(0);
 			if(!new_page){panic("Memory Allocation Failure in Region Alloc");}
@@ -423,6 +426,7 @@ env_create(uint8_t *binary, enum EnvType type)
 	cprintf("before loading icode\n");
 	load_icode(new_env, binary);
 	cprintf("after loading icode\n");
+	assert(new_env->env_pml4e != NULL);
 }
 
 //
@@ -436,15 +440,18 @@ env_free(struct Env *e)
 	physaddr_t pa;
 
 	// casting into kernel editable form.
-	cprintf("%llx\n", envs);
-	assert((int64_t)envs != UENVS);
-	e = envs + (size_t)((int64_t) e & 0xFFF);
+	if((int64_t)e <= UPAGES){
+		e = (struct Env *)((int64_t)envs + ((int64_t) e & 0x0000000000FFFFFFLL));
+	} 
+
 
 	// If freeing the current environment, switch to kern_pgdir
 	// before freeing the page directory, just in case the page
 	// gets reused.
-	if (e == curenv)
+	if (e == curenv){
 		lcr3(boot_cr3);
+	}
+		
 
 	// Note the environment's demise.
 	cprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
@@ -502,6 +509,7 @@ env_free(struct Env *e)
 	e->env_status = ENV_FREE;
 	e->env_link = env_free_list;
 	env_free_list = e;
+	return;
 }
 
 //
@@ -521,6 +529,7 @@ env_destroy(struct Env *e)
 	}
 
 	env_free(e);
+
 	if (curenv == e) {
 		curenv = NULL;
 		sched_yield();
@@ -588,13 +597,8 @@ env_run(struct Env *e)
 	}
 	curenv->env_status = ENV_RUNNING;
 	curenv->env_runs += 1;
-	// curenv = (struct Env*)(UENVS + ((int64_t)curenv & 0xFFF));
-	int64_t b = (int64_t)page_lookup(curenv->env_pml4e, (void*)0x804000, NULL);
-	cprintf("%d is b\n", b);
+	unlock_kernel();
 	lcr3(curenv->env_cr3);
-	b = (int64_t)page_lookup(curenv->env_pml4e, (void*)0x804000, NULL);
-	cprintf("%d is b\n", b);
-	// a = (*(int64_t*)0x804000);
 	env_pop_tf(&(curenv->env_tf));
 }
 

@@ -71,14 +71,30 @@ call *%rax
     // Restore the trap-time registers.  After you do this, you
     // can no longer modify any general-purpose registers.
     // LAB 4: Your code here.
+    
+    // setting up the the remote rsp, such that it is decremented by 8 bytes and restores the rip.
+    movq 152(%rsp), %rax
+    sub $8, %rax
+    movq 136(%rsp), %rbx
+    movq %rbx, 0(%rax)
+    movq %rax, 152(%rsp)
+
+    // restore register state
+    add $16, %rsp
+    POPA_
+
 
     // Restore eflags from the stack.  After you do this, you can
     // no longer use arithmetic operations or anything else that
     // modifies eflags.
     // LAB 4: Your code here.
+    pushq 8(%rsp); popfq
 
     // Switch back to the adjusted trap-time stack.
     // LAB 4: Your code here.
+    movq 16(%rsp), %rsp
+    
 
     // Return to re-execute the instruction that faulted.
     // LAB 4: Your code here.
+    ret

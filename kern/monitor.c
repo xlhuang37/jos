@@ -71,7 +71,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
     // I thought I could allocate memory by moving rsp register. I cannot.
     // So let's just use random unused memory.
     struct Ripdebuginfo* info;
-    info = (struct Ripdebuginfo*) 0x81200000;
+    info = (struct Ripdebuginfo*) 0x8004000000;
 
     cprintf("Stack backtrace:\n");
     __asm__ ("mov %%rsp, %0;" : "=r"(rsp));

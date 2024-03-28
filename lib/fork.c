@@ -2,19 +2,27 @@
 
 #include <inc/string.h>
 #include <inc/lib.h>
-
+#include <inc/mmu.h>
+#include <inc/types.h>
 // PTE_COW marks copy-on-write page table entries.
 // It is one of the bits explicitly allocated to user processes (PTE_AVAIL).
 #define PTE_COW		0x800
+
+extern void _pgfault_upcall(void);
+
 
 //
 // Custom page fault handler - if faulting page is copy-on-write,
 // map in our own private writable copy.
 //
+
+
 static void
 pgfault(struct UTrapframe *utf)
 {
-	void *addr = (void *) utf->utf_fault_va;
+	cprintf("inside the pgfault handler\n");
+	cprintf("utf is %llx\n", utf);
+	void *addr = (void *) ROUNDDOWN(utf->utf_fault_va, PGSIZE);
 	uint32_t err = utf->utf_err;
 	int r;
 
@@ -23,6 +31,14 @@ pgfault(struct UTrapframe *utf)
 	// Hint:
 	//   Use the read-only page table mappings at uvpt
 	//   (see <inc/memlayout.h>).
+	cprintf("the fault va is %llx\n", addr);
+	int permission = sys_get_pte_permission(addr);
+	if(!(permission & PTE_COW) 
+		|| !(err & PTE_W)){
+			panic("not a write or COW\n");
+		}
+	cprintf("can we even get here?\n");
+	
 
 	// LAB 4: Your code here.
 
@@ -34,8 +50,15 @@ pgfault(struct UTrapframe *utf)
 	//   No need to explicitly delete the old page's mapping.
 
 	// LAB 4: Your code here.
-
-	panic("pgfault not implemented");
+	cprintf("we should be allowed here!\n");
+	cprintf("%d\n", thisenv->env_id);
+	sys_page_alloc(0, PFTEMP, PTE_P|PTE_W|PTE_U);
+	cprintf("we should also be allowed here\n");
+	memmove(PFTEMP, addr, PGSIZE);
+	cprintf("we should be allowed here too\n");
+	sys_page_map(0, PFTEMP, 0, addr, PTE_P|PTE_W|PTE_U);
+	cprintf("exiting pgfault handler!\n");
+	return;
 }
 
 //
@@ -50,13 +73,23 @@ pgfault(struct UTrapframe *utf)
 // It is also OK to panic on error.
 //
 static int
-duppage(envid_t envid, unsigned pn)
+duppage(envid_t envid, void* addr, int permission)
 {
-	int r;
-
-	// LAB 4: Your code here.
-	panic("duppage not implemented");
-	return 0;
+	int r = 0;
+	if((permission & PTE_COW) 
+		||(permission & PTE_W)){
+			r = sys_page_map(0, addr, envid, addr, PTE_P|PTE_U|PTE_COW);
+			if(r != 0)
+				panic("");
+			r = sys_page_map(0, addr, 0, addr, PTE_P|PTE_U|PTE_COW);
+			if(r != 0)
+				panic("");
+	} else {
+		r = sys_page_map(0, addr, envid, addr, PTE_P|PTE_U);
+		if(r != 0)
+			panic("");
+	}
+	return r;
 }
 
 //
@@ -78,8 +111,51 @@ duppage(envid_t envid, unsigned pn)
 envid_t
 fork(void)
 {
+	envid_t envid;
+	int r;
+	extern unsigned char end[];
 	// LAB 4: Your code here.
-	panic("fork not implemented");
+	set_pgfault_handler(pgfault);
+	envid = sys_exofork();
+	
+	if (envid < 0)
+		panic("sys_exofork: %e", envid);
+	else if (envid == 0) {
+		// We're the child.
+		// The copied value of the global variable 'thisenv'
+		// is no longer valid (it refers to the parent!).
+		// Fix it and return 0.
+		cprintf("the child has %d\n", sys_getenvid());
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+	else {
+	// we are the parents
+	sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
+	int64_t curr_addr = (int64_t)0;
+	while(curr_addr < 0x2000000LL){
+		void* addr = (void*) curr_addr;
+		int permission = sys_get_pte_permission(addr);
+		if((permission & (PTE_P|PTE_U))){
+			if(duppage(envid, addr, permission)!= 0) panic("");
+		}
+		curr_addr += PGSIZE;
+	}
+	int permission = sys_get_pte_permission((void*)(USTACKTOP-PGSIZE));
+	if((permission & (PTE_P|PTE_U))){
+			if(duppage(envid, (void*)(USTACKTOP-PGSIZE), permission)!= 0){
+				panic("");
+			}
+	}
+	
+	sys_page_alloc(envid, (void*)(UXSTACKTOP - PGSIZE), PTE_P|PTE_W|PTE_U);
+	cprintf("allocated %d a exception stack!\n", envid);
+	// Start the child environment running
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
+		panic("sys_env_set_status: %e", r);
+
+	return envid;
+    }
 }
 
 // Challenge!
