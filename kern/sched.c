@@ -35,7 +35,6 @@ sched_yield(void)
 	if(!curenv){
 		next_env = (struct Env*) envs;
 	} else {
-		curenv->env_status = ENV_RUNNABLE;
 		next_env = curenv + (size_t) 1;
 	}
 	
@@ -53,7 +52,7 @@ sched_yield(void)
 		next_env = next_env + (size_t) 1;
 	}
 	if(curenv != NULL){
-		if(curenv->env_status == ENV_RUNNABLE){
+		if(curenv->env_status == ENV_RUNNING){
 			env_run(curenv);
 		}
 	}

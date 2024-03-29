@@ -8,6 +8,7 @@
 #include <inc/error.h>
 #include <inc/string.h>
 #include <inc/assert.h>
+#include <inc/env.h>
 
 #include <kern/env.h>
 #include <kern/pmap.h>
@@ -335,24 +336,62 @@ sys_page_unmap(envid_t envid, void *va)
 //
 // Returns 0 on success, < 0 on error.
 // Errors are:
-//	-E_BAD_ENV if environment envid doesn't currently exist.
+
+//	DONE -E_BAD_ENV if environment envid doesn't currently exist.
 //		(No need to check permissions.)
-//	-E_IPC_NOT_RECV if envid is not currently blocked in sys_ipc_recv,
+//	 DONE -E_IPC_NOT_RECV if envid is not currently blocked in sys_ipc_recv,
 //		or another environment managed to send first.
-//	-E_INVAL if srcva < UTOP but srcva is not page-aligned.
-//	-E_INVAL if srcva < UTOP and perm is inappropriate
+//	DONE -E_INVAL if srcva < UTOP but srcva is not page-aligned.
+//	DONE -E_INVAL if srcva < UTOP and perm is inappropriate
 //		(see sys_page_alloc).
-//	-E_INVAL if srcva < UTOP but srcva is not mapped in the caller's
+//	DONE -E_INVAL if srcva < UTOP but srcva is not mapped in the caller's
 //		address space.
-//	-E_INVAL if (perm & PTE_W), but srcva is read-only in the
+//	DONE -E_INVAL if (perm & PTE_W), but srcva is read-only in the
 //		current environment's address space.
-//	-E_NO_MEM if there's not enough memory to map srcva in envid's
+//	DONE -E_NO_MEM if there's not enough memory to map srcva in envid's
 //		address space.
 static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 		// LAB 4: Your code here.
-		panic("sys_ipc_try_send not implemented");
+		struct Env* targetenv = NULL;
+		if(envid2env(envid, &targetenv, 0)!=0){
+			return -E_BAD_ENV;
+		}
+		if(targetenv->env_status != 4 || targetenv->env_ipc_recving == 0){
+			return -E_IPC_NOT_RECV;
+		} else {
+			if((int64_t)srcva < UTOP && (int64_t)srcva%PGSIZE != 0) {
+				return -E_INVAL;
+			}
+			if((int64_t)srcva < UTOP && (!(perm & PTE_P)
+			|| !(perm & PTE_U)
+			|| (perm & (~(PTE_P | PTE_U | PTE_AVAIL | PTE_W)))))
+			{
+				return -E_INVAL;
+			}
+			if((int64_t)srcva < UTOP){
+				pte_t* pte_store = NULL;
+				struct PageInfo* srcpage = page_lookup(curenv->env_pml4e, srcva, &pte_store);
+				if(srcpage == NULL){
+					return -E_INVAL;
+				}
+				if(!((*pte_store) & PTE_W) && (perm & PTE_W)){
+					return -E_INVAL;
+				}
+				if(page_insert(targetenv->env_pml4e, srcpage, targetenv->env_ipc_dstva, perm)!=0){
+					return -E_NO_MEM;
+				}
+			}
+			
+			targetenv->env_ipc_recving = 0;
+			targetenv->env_ipc_from = curenv->env_id;
+			targetenv->env_ipc_value = value;
+			targetenv->env_ipc_perm = perm;
+			targetenv->env_status = ENV_RUNNABLE;
+			return 0;
+		}
+
 	}
 
 // Block until a value is ready.  Record that you want to receive
@@ -370,7 +409,13 @@ static int
 sys_ipc_recv(void *dstva)
 {
 	// LAB 4: Your code here.
-	panic("sys_ipc_recv not implemented");
+	
+	if((int64_t)dstva%PGSIZE != 0 && (int64_t)dstva < UTOP){
+		return -E_INVAL;
+	}
+	curenv->env_ipc_dstva = dstva;
+	curenv->env_status = 4;
+	curenv->env_ipc_recving = 1;
 	return 0;
 }
 
@@ -432,9 +477,9 @@ syscall(uint64_t syscallno, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, 
 			user_mem_assert((struct Env*)curenv, (void*)a2, 8, PTE_U);
 			return sys_env_set_pgfault_upcall(a1, (void*) a2);
 		case SYS_ipc_try_send:
-			break;
+			return sys_ipc_try_send(a1, a2, (void*) a3, a4);
 		case SYS_ipc_recv:
-			break;
+			return sys_ipc_recv((void*)a1);
 		case SYS_get_pte_permission:
 			return sys_get_pte_permission((void*)a1);
 		default:

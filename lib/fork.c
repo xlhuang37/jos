@@ -122,8 +122,8 @@ fork(void)
 	else {
 	// we are the parents
 	sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
-	int64_t curr_addr = (int64_t)0;
-	while(curr_addr < 0x812000LL){
+	int64_t curr_addr = (int64_t)0x800000LL;
+	while(curr_addr < 0x805000LL){
 		void* addr = (void*) curr_addr;
 		int permission = sys_get_pte_permission(addr);
 		if((permission & (PTE_P|PTE_U))){
