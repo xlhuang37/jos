@@ -20,8 +20,6 @@ extern void _pgfault_upcall(void);
 static void
 pgfault(struct UTrapframe *utf)
 {
-	cprintf("inside the pgfault handler\n");
-	cprintf("utf is %llx\n", utf);
 	void *addr = (void *) ROUNDDOWN(utf->utf_fault_va, PGSIZE);
 	uint32_t err = utf->utf_err;
 	int r;
@@ -31,13 +29,11 @@ pgfault(struct UTrapframe *utf)
 	// Hint:
 	//   Use the read-only page table mappings at uvpt
 	//   (see <inc/memlayout.h>).
-	cprintf("the fault va is %llx\n", addr);
 	int permission = sys_get_pte_permission(addr);
 	if(!(permission & PTE_COW) 
 		|| !(err & PTE_W)){
 			panic("not a write or COW\n");
 		}
-	cprintf("can we even get here?\n");
 	
 
 	// LAB 4: Your code here.
@@ -50,14 +46,9 @@ pgfault(struct UTrapframe *utf)
 	//   No need to explicitly delete the old page's mapping.
 
 	// LAB 4: Your code here.
-	cprintf("we should be allowed here!\n");
-	cprintf("%d\n", thisenv->env_id);
 	sys_page_alloc(0, PFTEMP, PTE_P|PTE_W|PTE_U);
-	cprintf("we should also be allowed here\n");
 	memmove(PFTEMP, addr, PGSIZE);
-	cprintf("we should be allowed here too\n");
 	sys_page_map(0, PFTEMP, 0, addr, PTE_P|PTE_W|PTE_U);
-	cprintf("exiting pgfault handler!\n");
 	return;
 }
 
@@ -125,7 +116,6 @@ fork(void)
 		// The copied value of the global variable 'thisenv'
 		// is no longer valid (it refers to the parent!).
 		// Fix it and return 0.
-		cprintf("the child has %d\n", sys_getenvid());
 		thisenv = &envs[ENVX(sys_getenvid())];
 		return 0;
 	}
@@ -133,7 +123,7 @@ fork(void)
 	// we are the parents
 	sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
 	int64_t curr_addr = (int64_t)0;
-	while(curr_addr < 0x2000000LL){
+	while(curr_addr < 0x812000LL){
 		void* addr = (void*) curr_addr;
 		int permission = sys_get_pte_permission(addr);
 		if((permission & (PTE_P|PTE_U))){
@@ -149,7 +139,6 @@ fork(void)
 	}
 	
 	sys_page_alloc(envid, (void*)(UXSTACKTOP - PGSIZE), PTE_P|PTE_W|PTE_U);
-	cprintf("allocated %d a exception stack!\n", envid);
 	// Start the child environment running
 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
 		panic("sys_env_set_status: %e", r);

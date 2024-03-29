@@ -41,29 +41,20 @@ sched_yield(void)
 	
 	while(next_env < envs + (size_t) NENV){
 		if(next_env->env_status == ENV_RUNNABLE){
-			cprintf("before env run\n");
-			cprintf("the env pml4e is %llx\n", next_env->env_pml4e);
 			env_run(next_env);
-			panic("env run returned?");
 		}
 		next_env = next_env + (size_t) 1;
 	}
 	next_env = envs;
 	while(next_env < curenv){
 		if(next_env->env_status == ENV_RUNNABLE){
-						cprintf("before env run\n");
-			cprintf("the env pml4e is %llx\n", next_env->env_pml4e);
 			env_run(next_env);
-			panic("env run returned?");
 		}
 		next_env = next_env + (size_t) 1;
 	}
 	if(curenv != NULL){
 		if(curenv->env_status == ENV_RUNNABLE){
-						cprintf("before env run\n");
-			cprintf("the env pml4e is %llx\n", next_env->env_pml4e);
 			env_run(curenv);
-			panic("env run returned?");
 		}
 	}
 	sched_halt();
@@ -77,7 +68,6 @@ sched_yield(void)
 void
 sched_halt(void)
 {
-	cprintf("CPU %d halting!\n", thiscpu->cpu_id);
 	int i;
 
 	// For debugging and testing purposes, if there are no runnable
@@ -113,7 +103,7 @@ sched_halt(void)
 		"pushq $0\n"
 		"pushq $0\n"
 		// Uncomment the sti  for Part C, Exercise 13
-		// "sti\n"
+		"sti\n"
 		"hlt\n"
 		: : "a" (thiscpu->cpu_ts.ts_esp0));
 }

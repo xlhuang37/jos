@@ -77,11 +77,11 @@ trap_init(void)
 	idt_pd.pd_lim = sizeof(idt)-1;
 	idt_pd.pd_base = (uint64_t)idt;
 	for(int i = 0; i < 32; i++){
-		SETGATE(idt[i], i, GD_KT, handlers[i], 0);
+		SETGATE(idt[i], 0, GD_KT, handlers[i], 0);
 	}
-	SETGATE(idt[3], 3, GD_KT, handlers[3], 3); // Override permission for BREAKPOINT.
+	SETGATE(idt[3], 0, GD_KT, handlers[3], 3); // Override permission for BREAKPOINT.
 	for(int i = 32; i < 49; i++){
-		SETGATE(idt[i], i, GD_KT, handlers[i], 3);
+		SETGATE(idt[i], 0, GD_KT, handlers[i], 3);
 	}
 
 	// Per-CPU setup
@@ -188,6 +188,7 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
+	
 	switch(tf->tf_trapno){
 		case T_DIVIDE: cprintf("\n\n\n\n"); break;
 		case T_PGFLT: page_fault_handler(tf); return;
@@ -202,6 +203,13 @@ trap_dispatch(struct Trapframe *tf)
 			tf->tf_regs.reg_rax = (tf->tf_regs.reg_rax & (int64_t)0x0LL)
 										| (int64_t) ret;
 			return;
+		// Handle clock interrupts. Don't forget to acknowledge the
+		// interrupt using lapic_eoi() before calling the scheduler!
+		// LAB 4: Your code here.
+		case (IRQ_OFFSET + IRQ_TIMER):
+			lapic_eoi();
+			sched_yield();
+			break;
 		default: break;
 	}
 	
@@ -215,9 +223,7 @@ trap_dispatch(struct Trapframe *tf)
 		return;
 	}
 
-	// Handle clock interrupts. Don't forget to acknowledge the
-	// interrupt using lapic_eoi() before calling the scheduler!
-	// LAB 4: Your code here.
+
 
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -235,7 +241,6 @@ void
 trap(struct Trapframe *tf)
 {
 	// cprintf("trapframe is %llx\n", tf);
-
 	//struct Trapframe *tf = &tf_;
 	// The environment may have set DF and some versions
 	// of GCC rely on DF being clear
@@ -254,7 +259,6 @@ trap(struct Trapframe *tf)
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
-
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
 		// Acquire the big kernel lock before doing any
@@ -354,11 +358,8 @@ page_fault_handler(struct Trapframe *tf)
 
 	// check if user exception handle stack does not exist or does not have write permission
 	// if it does not exist, user_mem_assert kills the environment for us.
-	cprintf("checking if there is an exception stack for %d\n", curenv->env_id);
 	if (user_mem_assert_nodestroy(curenv, (void*)(UXSTACKTOP - PGSIZE), PGSIZE, PTE_W | PTE_P | PTE_U) == 0){
-		cprintf("Yes there is an exception stack for %d\n", curenv->env_id);
 		if(curenv->env_pgfault_upcall != 0) {
-			cprintf("entering user memory check\n");
 			int64_t rspcpy = tf->tf_rsp;
 			// check if on user exception stack
 			if(rspcpy >= (UXSTACKTOP - PGSIZE) && rspcpy < UXSTACKTOP) {
@@ -373,7 +374,6 @@ page_fault_handler(struct Trapframe *tf)
 			}
 			rspcpy -= sizeof(struct UTrapframe);
 			struct UTrapframe* utrap = (struct UTrapframe*) rspcpy;
-			cprintf("can we reach here in user memory check?\n");
 			if((int64_t)utrap >= UXSTACKTOP - PGSIZE){
 				utrap->utf_fault_va = fault_va;
 				utrap->utf_err = tf->tf_err;
