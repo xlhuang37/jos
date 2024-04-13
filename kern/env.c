@@ -126,7 +126,6 @@ env_init(void)
 
 
 	memset(envs, 0, PGSIZE);
-	cprintf("envs is %llx\n", envs);
 	struct Env * prev_env = envs;
 	env_free_list = prev_env;
 	prev_env->env_id = 0;
@@ -426,13 +425,14 @@ env_create(uint8_t *binary, enum EnvType type)
 	struct Env* new_env;
 	int r = env_alloc(&new_env, 0);
 	if(r!=0){panic("env_create error %e", r);};
-	cprintf("before loading icode\n");
 	load_icode(new_env, binary);
-	cprintf("after loading icode\n");
 	assert(new_env->env_pml4e != NULL);
 
 	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
 	// LAB 5: Your code here.
+	if(type == ENV_TYPE_FS) { 
+		new_env->env_tf.tf_eflags |= FL_IOPL_MASK;
+	}
 }
 
 //

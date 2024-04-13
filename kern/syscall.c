@@ -95,10 +95,6 @@ sys_exofork(void)
 	// LAB 4: Your code here.
 	struct Env* return_env = NULL;
 	int retval = env_alloc(&return_env, curenv->env_id);
-	cprintf("curenv->%llx\n", curenv->env_id);
-	cprintf("retenv->%llx\n", return_env->env_id);
-	cprintf("curenv cr3 %llx\n", curenv->env_cr3);
-	cprintf("retenv cr3 %llx\n", return_env->env_cr3);
 	if(retval != 0){
 		return -retval;
 	}
