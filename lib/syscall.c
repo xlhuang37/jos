@@ -30,7 +30,6 @@ syscall(int num, int check, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, 
 		       "D" (a4),
 		       "S" (a5)
 		     : "cc", "memory");
-
 	if(check && ret > 0)
 		panic("syscall %d returned %d (> 0)", num, ret);
 
@@ -117,3 +116,11 @@ sys_ipc_recv(void *dstva)
 	return syscall(SYS_ipc_recv, 1, (uint64_t)dstva, 0, 0, 0, 0);
 }
 
+int
+sys_get_pte_permission(void *va){
+	return syscall(SYS_get_pte_permission, 0, (int64_t)va, 0, 0, 0, 0);
+}
+
+int sys_child_mmap(envid_t srcenvid, envid_t dstenvid){
+	return syscall(SYS_child_mmap, 0, srcenvid, dstenvid, 0, 0, 0);
+}

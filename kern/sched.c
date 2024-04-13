@@ -31,6 +31,31 @@ sched_yield(void)
 
 	// LAB 4: Your code here.
 	// sched_halt never returns
+	struct Env* next_env;
+	if(!curenv){
+		next_env = (struct Env*) envs;
+	} else {
+		next_env = curenv + (size_t) 1;
+	}
+	
+	while(next_env < envs + (size_t) NENV){
+		if(next_env->env_status == ENV_RUNNABLE){
+			env_run(next_env);
+		}
+		next_env = next_env + (size_t) 1;
+	}
+	next_env = envs;
+	while(next_env < curenv){
+		if(next_env->env_status == ENV_RUNNABLE){
+			env_run(next_env);
+		}
+		next_env = next_env + (size_t) 1;
+	}
+	if(curenv != NULL){
+		if(curenv->env_status == ENV_RUNNING){
+			env_run(curenv);
+		}
+	}
 	sched_halt();
 }
 
@@ -77,7 +102,7 @@ sched_halt(void)
 		"pushq $0\n"
 		"pushq $0\n"
 		// Uncomment the sti  for Part C, Exercise 13
-		// "sti\n"
+		"sti\n"
 		"hlt\n"
 		: : "a" (thiscpu->cpu_ts.ts_esp0));
 }
