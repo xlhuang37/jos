@@ -289,7 +289,9 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 	// commit the allocation
 	env_free_list = e->env_link;
 	*newenv_store = e;
-	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+  
+  // commented out by lab 5
+	// cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 	return 0;
 }
 
@@ -420,6 +422,7 @@ load_icode(struct Env *e, uint8_t *binary)
 void
 env_create(uint8_t *binary, enum EnvType type)
 {
+  // LAB 3: Your code here.
 	struct Env* new_env;
 	int r = env_alloc(&new_env, 0);
 	if(r!=0){panic("env_create error %e", r);};
@@ -427,6 +430,9 @@ env_create(uint8_t *binary, enum EnvType type)
 	load_icode(new_env, binary);
 	cprintf("after loading icode\n");
 	assert(new_env->env_pml4e != NULL);
+
+	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
+	// LAB 5: Your code here.
 }
 
 //
@@ -454,7 +460,7 @@ env_free(struct Env *e)
 		
 
 	// Note the environment's demise.
-	cprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
+	// cprintf("[%08x] free env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 
 	// Flush all mapped pages in the user portion of the address space
 	if (e->env_pml4e[0] & PTE_P) {
