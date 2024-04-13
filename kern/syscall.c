@@ -440,7 +440,47 @@ static int sys_get_pte_permission(void* va){
 }
 
 
-
+static int sys_child_mmap(envid_t srcenvid, envid_t dstenvid){
+	
+	int64_t PTE_COW = 0x800;
+	struct Env* src_env = NULL;
+	struct Env* dst_env = NULL;
+	if(envid2env(srcenvid, &src_env, 1) != 0){
+		return -E_BAD_ENV;
+	}
+	if(envid2env(dstenvid, &dst_env, 1) != 0){
+		return -E_BAD_ENV;
+	}
+	int64_t curr_addr = 0x0;
+	while(curr_addr < UTOP && curr_addr != (UXSTACKTOP - PGSIZE)) {
+		pte_t* pte_store = NULL;
+		struct PageInfo* page = page_lookup(src_env->env_pml4e, (void*) curr_addr, &pte_store);
+		if(pte_store == NULL) {
+			curr_addr += PGSIZE;
+			continue;
+		} else {
+			int permission = (*pte_store) & (0xFFFLL);
+			int perm;
+			if((permission & PTE_COW) 
+		      ||(permission & PTE_W)) { 
+				perm = PTE_P|PTE_U|PTE_COW;
+				if(page_insert(dst_env->env_pml4e, page, (void*) curr_addr, perm) != 0){
+					return -E_NO_MEM;
+				}
+				if(page_insert(src_env->env_pml4e, page, (void*) curr_addr, perm) != 0){
+					return -E_NO_MEM;
+				}
+			  } else {
+				perm = PTE_P|PTE_U;
+				if(page_insert(dst_env->env_pml4e, page, (void*) curr_addr, perm) != 0){
+					return -E_NO_MEM;
+				} 
+			  }
+			curr_addr += PGSIZE;
+		}
+	}
+	return 0;
+}
 
 
 // Dispatches to the correct kernel function, passing the arguments.
@@ -482,6 +522,8 @@ syscall(uint64_t syscallno, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, 
 			return sys_ipc_recv((void*)a1);
 		case SYS_get_pte_permission:
 			return sys_get_pte_permission((void*)a1);
+		case SYS_child_mmap:
+			return sys_child_mmap(a1, a2);
 		default:
 			return -E_INVAL;
 		}

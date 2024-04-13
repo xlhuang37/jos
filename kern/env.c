@@ -384,7 +384,6 @@ load_icode(struct Env *e, uint8_t *binary)
 	struct PageInfo* stackPage = page_alloc(0);
 	if(!stackPage){panic("Page Alloc Error in load_inode\n");}
 	page_insert(e->env_pml4e, stackPage, (void*)(USTACKTOP - PGSIZE), PTE_W | PTE_U | PTE_P);
-	struct PageInfo* userPage = page_alloc(0);
 	// LAB 3: Your code here.
 	e->elf = binary;
 	struct Elf* elf = (struct Elf*) binary;
@@ -587,7 +586,6 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-
 	if(curenv){
 		if(curenv->env_status == ENV_RUNNING){
 			curenv->env_status = ENV_RUNNABLE;

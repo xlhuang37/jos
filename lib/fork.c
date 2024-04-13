@@ -121,25 +121,25 @@ fork(void)
 	}
 	else {
 	// we are the parents
-	sys_env_set_pgfault_upcall(envid, _pgfault_upcall);
-	int64_t curr_addr = (int64_t)0x800000LL;
-	while(curr_addr < 0x805000LL){
-		void* addr = (void*) curr_addr;
-		int permission = sys_get_pte_permission(addr);
-		if((permission & (PTE_P|PTE_U))){
-			if(duppage(envid, addr, permission)!= 0) panic("");
-		}
-		curr_addr += PGSIZE;
+	int r = sys_child_mmap(0, envid);
+	if(r != 0){
+		panic("");
 	}
-	int permission = sys_get_pte_permission((void*)(USTACKTOP-PGSIZE));
-	if((permission & (PTE_P|PTE_U))){
-			if(duppage(envid, (void*)(USTACKTOP-PGSIZE), permission)!= 0){
-				panic("");
-			}
-	}
+	if(sys_env_set_pgfault_upcall(envid, _pgfault_upcall)!=0)
+		panic("setting fault upcall is having errors");
+	// int64_t curr_addr = (int64_t)0x800000LL;
+	// while(curr_addr < 0x805000LL){
+	// 	void* addr = (void*) curr_addr;
+	// 	int permission = sys_get_pte_permission(addr);
+	// 	if((permission & (PTE_P|PTE_U))){
+	// 		if(duppage(envid, addr, permission)!= 0) panic("");
+	// 	}
+	// 	curr_addr += PGSIZE;
+	// }
 	
 	sys_page_alloc(envid, (void*)(UXSTACKTOP - PGSIZE), PTE_P|PTE_W|PTE_U);
-	// Start the child environment running
+
+
 	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
 		panic("sys_env_set_status: %e", r);
 

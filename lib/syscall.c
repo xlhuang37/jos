@@ -114,3 +114,7 @@ int
 sys_get_pte_permission(void *va){
 	return syscall(SYS_get_pte_permission, 0, (int64_t)va, 0, 0, 0, 0);
 }
+
+int sys_child_mmap(envid_t srcenvid, envid_t dstenvid){
+	return syscall(SYS_child_mmap, 0, srcenvid, dstenvid, 0, 0, 0);
+}

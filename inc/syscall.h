@@ -17,6 +17,7 @@ enum {
 	SYS_ipc_try_send,
 	SYS_ipc_recv,
 	SYS_get_pte_permission,
+	SYS_child_mmap,
 	NSYSCALLS
 };
 
