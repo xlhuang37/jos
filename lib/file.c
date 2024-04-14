@@ -84,8 +84,7 @@ open(const char *path, int mode)
 		return -E_BAD_PATH;
 	}
 	fsipcbuf.open.req_omode = mode;
-	memcpy(fsipcbuf.open.req_path, path, 1024);
-	
+	strcpy(fsipcbuf.open.req_path, path);
 	r = fsipc(FSREQ_OPEN, fd_store);
 	if(r < 0){
 		fd_close(fd_store, 0);

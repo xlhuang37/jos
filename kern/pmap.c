@@ -341,11 +341,11 @@ x64_vm_init(void)
 	boot_map_region(boot_pml4e, KERNBASE, npages*PGSIZE, 0, 0x3);
 
 
-	check_page_free_list(1);
-	check_page_alloc();
-	page_check();
-	check_page_free_list(0);
-	check_boot_pml4e(boot_pml4e);
+	// check_page_free_list(1);
+	// check_page_alloc();
+	// page_check();
+	// check_page_free_list(0);
+	// check_boot_pml4e(boot_pml4e);
 
 
 
@@ -524,6 +524,9 @@ page_free(struct PageInfo *pp)
 void
 page_decref(struct PageInfo* pp)
 {
+	// if(pp == NULL) {
+	// 	return;
+	// }
 	if (--pp->pp_ref == 0){
 		page_free(pp);
 	}

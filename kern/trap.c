@@ -212,10 +212,10 @@ trap_dispatch(struct Trapframe *tf)
 			break;
 		case (IRQ_OFFSET + IRQ_KBD):
 			kbd_intr();
-			break;
+			return;
 		case (IRQ_OFFSET+IRQ_SERIAL):
 			serial_intr();
-			break;
+			return;
 		default: break;
 	}
 	
@@ -327,7 +327,6 @@ page_fault_handler(struct Trapframe *tf)
 		print_trapframe(tf);
 		panic("Page Fault in kernel: %llx\n", fault_va);
 	}
-
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 

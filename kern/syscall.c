@@ -323,8 +323,14 @@ sys_page_unmap(envid_t envid, void *va)
 	if(envid2env(envid, &return_env, 1) != 0){
 		return -E_BAD_ENV;
 	} else{
-		page_remove(return_env->env_pml4e, va);
-		return 0;
+		struct PageInfo* page_to_remove = page_lookup(return_env->env_pml4e, va, NULL);
+		if(page_to_remove == NULL) {
+			return 0;
+		} else { 
+			page_remove(return_env->env_pml4e, va);
+			return 0;
+		}
+
 	}
 }
 
