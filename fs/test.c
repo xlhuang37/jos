@@ -26,6 +26,7 @@ fs_test(void)
 	assert(bits[r/32] & (1 << (r%32)));
 	// and is not free any more
 	assert(!(bitmap[r/32] & (1 << (r%32))));
+	cprintf("alloc_block is good\n");
 
 	if ((r = file_open("/not-found", &f)) < 0 && r != -E_NOT_FOUND)
 		panic("file_open /not-found: %e", r);
@@ -33,12 +34,13 @@ fs_test(void)
 		panic("file_open /not-found succeeded!");
 	if ((r = file_open("/newmotd", &f)) < 0)
 		panic("file_open /newmotd: %e", r);
-
+	cprintf("file_open is good\n");
 
 	if ((r = file_get_block(f, 0, &blk)) < 0)
 		panic("file_get_block: %e", r);
 	if (strcmp(blk, msg) != 0)
 		panic("file_get_block returned wrong data");
+	cprintf("file_get_block is good\n");
 
 	*(volatile char*)blk = *(volatile char*)blk;
 	assert((uvpt[PGNUM(blk)] & PTE_D));
