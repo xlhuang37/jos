@@ -214,7 +214,7 @@ env_setup_vm(struct Env *e)
 	e->env_pml4e[1] = boot_pml4e[1];
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
-	page_insert(e->env_pml4e, p, (void*) UVPT, PTE_P|PTE_U);
+	e->env_pml4e[2] = (e->env_cr3 | PTE_U | PTE_P);
 
 
 	return 0;
@@ -431,7 +431,7 @@ env_create(uint8_t *binary, enum EnvType type)
 	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
 	// LAB 5: Your code here.
 	if(type == ENV_TYPE_FS) { 
-		new_env->env_tf.tf_eflags |= FL_IOPL_MASK;
+		new_env->env_tf.tf_eflags |= FL_IOPL_MASK; 
 	}
 }
 

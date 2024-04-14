@@ -66,8 +66,18 @@ alloc_block(void)
 	// super->s_nblocks blocks in the disk altogether.
 
 	// LAB 5: Your code here.
-	panic("alloc_block not implemented");
+	uint32_t blockno = 2;
+	while(blockno < super->s_nblocks) {
+		if(block_is_free(blockno)) {
+			bitmap[blockno/32] &= ~(1<<(blockno%32));
+			flush_block(bitmap);
+			flush_block(diskaddr(blockno));
+			return blockno;
+		}
+		blockno += 1;
+	}
 	return -E_NO_DISK;
+	
 }
 
 // Validate the file system bitmap.
@@ -142,8 +152,38 @@ fs_init(void)
 int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
+
         // LAB 5: Your code here.
-        panic("file_block_walk not implemented");
+		if(filebno >=  NDIRECT + NINDIRECT) {
+			return -E_INVAL;
+		}
+		if(filebno < NDIRECT) { 
+			uint32_t blockno = f->f_direct[filebno];
+			if(blockno == 0 && alloc == false){
+				cprintf("free\n");
+				return -E_NOT_FOUND;
+			}
+			*ppdiskbno = &(f->f_direct[filebno]);
+		} else {
+			if(f->f_indirect == 0) {
+				if(alloc) { 
+					int32_t new_indirect = alloc_block();
+					if(new_indirect < 0) 
+						return new_indirect;
+					f->f_indirect = new_indirect;
+					memset(diskaddr(new_indirect), 0, PGSIZE);
+					flush_block(diskaddr(new_indirect));
+				} else { 
+					return -E_NOT_FOUND;
+				}
+			} 
+				
+			uint32_t* indirect_ptr = diskaddr(f->f_indirect);
+			uint32_t blockno = indirect_ptr[filebno - 10];
+			*ppdiskbno = &(f->f_direct[filebno]);
+		}
+
+		return 0;
 }
 
 // Set *blk to the address in memory where the filebno'th
@@ -157,7 +197,20 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
 	// LAB 5: Your code here.
-	panic("file_block_walk not implemented");
+	uint32_t* ppdiskbno;
+	int ret;
+	ret = file_block_walk(f, filebno, &ppdiskbno, 1);
+	cprintf("ret is %llx\n", ret);
+	if(ret < 0)
+		return ret;
+	if(*ppdiskbno == 0) {
+		ret = alloc_block();
+		if(ret < 0)
+			return ret;
+		*ppdiskbno = ret;
+	}
+	*blk = diskaddr(*ppdiskbno);
+	return 0;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.
@@ -181,6 +234,7 @@ dir_lookup(struct File *dir, const char *name, struct File **file)
 		if ((r = file_get_block(dir, i, &blk)) < 0)
 			return r;
 		f = (struct File*) blk;
+		cprintf("dir lookup blk is %llx\n", blk);
 		for (j = 0; j < BLKFILES; j++)
 			if (strcmp(f[j].f_name, name) == 0) {
 				*file = &f[j];
@@ -384,6 +438,7 @@ file_free_block(struct File *f, uint32_t filebno)
 
 	if ((r = file_block_walk(f, filebno, &ptr, 0)) < 0)
 		return r;
+	cprintf("freeing %llx\n", ptr);
 	if (*ptr) {
 		free_block(*ptr);
 		*ptr = 0;
@@ -422,9 +477,11 @@ file_truncate_blocks(struct File *f, off_t newsize)
 int
 file_set_size(struct File *f, off_t newsize)
 {
+	cprintf("before truncate %llx\n", f->f_direct[0]);
 	if (f->f_size > newsize)
 		file_truncate_blocks(f, newsize);
 	f->f_size = newsize;
+	cprintf("after truncate %llx\n", f->f_direct[0]);
 	flush_block(f);
 	return 0;
 }
@@ -438,11 +495,13 @@ file_flush(struct File *f)
 {
 	int i;
 	uint32_t *pdiskbno;
-
+	cprintf("file size is %llx\n", f->f_size);
 	for (i = 0; i < (f->f_size + BLKSIZE - 1) / BLKSIZE; i++) {
+		cprintf("are we here?\n");
 		if (file_block_walk(f, i, &pdiskbno, 0) < 0 ||
 		    pdiskbno == NULL || *pdiskbno == 0)
 			continue;
+		cprintf("pdiskbno is %llx\n", pdiskbno);
 		flush_block(diskaddr(*pdiskbno));
 	}
 	flush_block(f);

@@ -29,7 +29,19 @@ pgfault(struct UTrapframe *utf)
 	// Hint:
 	//   Use the read-only page table mappings at uvpt
 	//   (see <inc/memlayout.h>).
+	
 	int permission = sys_get_pte_permission(addr);
+
+	// The following section is the intended permission checking scheme
+	// Through self referencing, you will be able to trick page table into giving you 
+	// the pte, pde, pdpe, even though all of them should be "hidden," 
+	// and only pml4e is visible at UVPT. 
+	// To see the mechanicism behind this trick, see https://os.phil-opp.com/page-tables/
+	// CODE:
+	// int64_t permission_2 = uvpt[((int64_t)addr >> PGSHIFT)];
+	// cprintf("permission 2 is hey yeah %llx\n", permission_2);
+	// cprintf("permission is hey yeah %llx\n", permission);
+
 	if(!(permission & PTE_COW) 
 		|| !(err & PTE_W)){
 			panic("not a write or COW\n");

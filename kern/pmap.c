@@ -567,6 +567,7 @@ pml4e_walk(pml4e_t *pml4e, const void *va, int create)
 	pdpe_t* pml4e_entry = (pdpe_t*)*(pml4e + PML4(va));
 	if(!pml4e_entry){
 		if(!create){
+			cprintf("duh 1\n");
 			return NULL;
 		}
 		else{
@@ -720,7 +721,7 @@ page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
 		page_remove(pml4e, va);
 		if(pp->pp_link){
 			// Must have been freed, and it will be the first in the list.
-			struct PageInfo* new_pp = page_alloc(1);
+			struct PageInfo* new_pp = page_alloc(0);
 			assert(new_pp == pp);
 		}
 	}
@@ -789,8 +790,10 @@ void
 page_remove(pml4e_t *pml4e, void *va)
 {
 	struct PageInfo * page_to_remove = page_lookup(pml4e, va, NULL);
-	pte_t* page_table = pml4e_walk(pml4e, va, false);
-	*(page_table) = (pte_t) NULL;
+	pte_t* pte_entry = pml4e_walk(pml4e, va, false);
+	*(pte_entry) = (pte_t) NULL;
+	
+
 	page_decref(page_to_remove);
 	tlb_invalidate(pml4e, va);
 }

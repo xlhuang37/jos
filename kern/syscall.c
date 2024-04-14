@@ -287,7 +287,6 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	if((perm&PTE_W) && (!((int64_t)(*page_table_entry)&PTE_W))){
 		return -E_INVAL;
 	}
-
 	if(page_insert(dst_env->env_pml4e, src_page, dstva, perm) != 0){
 		return -E_NO_MEM;
 	} else{
