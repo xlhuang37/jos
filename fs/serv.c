@@ -124,7 +124,7 @@ serve_open(envid_t envid, struct Fsreq_open *req,
 			cprintf("openfile_alloc failed: %e", r);
 		return r;
 	}
-	fileid = r;
+
 
 	// Open the file
 	if (req->req_omode & O_CREAT) {
@@ -217,7 +217,23 @@ serve_read(envid_t envid, union Fsipc *ipc)
 	// so filling in ret will overwrite req.
 	//
 	// LAB 5: Your code here
-	panic("serve_read not implemented");
+	struct OpenFile *o;
+	signed int r;
+
+	r = openfile_lookup(envid, req->req_fileid, &o);
+	if (r < 0)
+		return -E_INVAL;
+	
+	int read_size = PGSIZE;
+	if(req->req_n < PGSIZE) {
+		read_size = req->req_n;
+	}
+	r = file_read(o->o_file, ret->ret_buf, read_size, o->o_fd->fd_offset);
+	if(r < 0)
+		return -E_INVAL;
+	
+	o->o_fd->fd_offset += r;
+	return r;
 }
 
 
@@ -232,7 +248,25 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// LAB 5: Your code here.
-	panic("serve_write not implemented");
+	struct OpenFile *o;
+	signed int r;
+	r = openfile_lookup(envid, req->req_fileid, &o);
+	if (r < 0)
+		return -E_INVAL;
+	
+	int write_size = PGSIZE;
+	if(req->req_n < PGSIZE) {
+		write_size = req->req_n;
+	}
+	r = file_write(o->o_file, req->req_buf, write_size, o->o_fd->fd_offset);
+	if(r < 0)
+		return -E_INVAL;
+	if((o->o_fd->fd_offset + r) > o->o_file->f_size) {
+		o->o_file->f_size = o->o_fd->fd_offset + r;
+	}
+	o->o_fd->fd_offset += r;
+	file_flush(o->o_file);
+	return r;
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the

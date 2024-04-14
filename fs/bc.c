@@ -122,8 +122,6 @@ check_bc(void)
 	assert(!va_is_mapped(diskaddr(1)));
 
 	// read it back in
-	
-	cprintf("strcmp is %s\n", 0x10001000);
 	assert(strcmp(diskaddr(1), "OOPS!\n") == 0);
 
 	// fix it

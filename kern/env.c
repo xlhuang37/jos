@@ -382,7 +382,7 @@ load_icode(struct Env *e, uint8_t *binary)
 	// LAB 3: Your code hered
 	// DONE Now map one page for the program's initial stack
 	// DONE at virtual address USTACKTOP - PGSIZE.
-	struct PageInfo* stackPage = page_alloc(0);
+	struct PageInfo* stackPage = page_alloc(1);
 	if(!stackPage){panic("Page Alloc Error in load_inode\n");}
 	page_insert(e->env_pml4e, stackPage, (void*)(USTACKTOP - PGSIZE), PTE_W | PTE_U | PTE_P);
 	// LAB 3: Your code here.
@@ -433,6 +433,7 @@ env_create(uint8_t *binary, enum EnvType type)
 	if(type == ENV_TYPE_FS) { 
 		new_env->env_tf.tf_eflags |= FL_IOPL_MASK; 
 	}
+	new_env->env_type = type;
 }
 
 //

@@ -136,7 +136,6 @@ spawn(const char *prog, const char **argv)
 
 	if ((r = sys_env_set_status(child, ENV_RUNNABLE)) < 0)
 		panic("sys_env_set_status: %e", r);
-
 	return child;
 
 error:
@@ -173,6 +172,7 @@ spawnl(const char *prog, const char *arg0, ...)
 	for(i=0;i<argc;i++)
 		argv[i+1] = va_arg(vl, const char *);
 	va_end(vl);
+
 	return spawn(prog, argv);
 }
 
@@ -303,6 +303,29 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+	int64_t curr_addr = (int64_t)0x0LL;
+	while(curr_addr < UTOP && curr_addr != (UXSTACKTOP - PGSIZE)){
+		if(!(uvpml4e[VPML4E(curr_addr)] & (PTE_P))) { 
+			curr_addr += PGSIZE;
+			continue;
+		} else if(!(uvpde[VPDPE(curr_addr)] & (PTE_P))) {
+			curr_addr += PGSIZE;
+			continue;
+		} else if(!(uvpd[VPD(curr_addr)] & (PTE_P))) {
+			curr_addr += PGSIZE;
+			continue;
+		} else if (!(uvpt[(curr_addr >> PGSHIFT)] & (PTE_SHARE))
+			|| !(uvpt[(curr_addr >> PGSHIFT)] & (PTE_U))
+		) {
+			curr_addr += PGSIZE;
+			continue;
+		} else {
+			int permission = (uvpt[(curr_addr >> PGSHIFT)] & PTE_USER);
+			sys_page_map(0, (void*)curr_addr, child, (void*)curr_addr, permission);
+		}
+		curr_addr += PGSIZE;
+	}
 	return 0;
 }
+
 

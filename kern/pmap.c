@@ -717,16 +717,20 @@ page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
 	pte_t* ptep = pml4e_walk(pml4e, va, 1);
 	if(!ptep){return -E_NO_MEM;}
 	pte_t pte = *(ptep);
-	if(pte){
-		page_remove(pml4e, va);
-		if(pp->pp_link){
-			// Must have been freed, and it will be the first in the list.
-			struct PageInfo* new_pp = page_alloc(0);
-			assert(new_pp == pp);
-		}
-	}
 	physaddr_t pa = page2pa(pp);
 	perm = (perm|PTE_P) & 0xFFF; // Make sure only lower 12 bits
+
+
+	if(pte){
+		if(PTE_ADDR(pte) == pa) {
+			pte = pa + (long long unsigned int)perm;
+			*(ptep) = pte;
+			return 0;
+		} else {
+			page_remove(pml4e, va);
+		}
+
+	}
 	pte = pa + (long long unsigned int)perm;
 	*(ptep) = pte;
 	pp->pp_ref += 1;

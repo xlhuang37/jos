@@ -159,6 +159,8 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 		}
 		if(filebno < NDIRECT) { 
 			uint32_t blockno = f->f_direct[filebno];
+			// In the instruction it should probly make clear that 0 means empty
+			// I used block_is_empty(), which was dumb, because bipmap is shared across environments;
 			if(blockno == 0 && alloc == false){
 				cprintf("free\n");
 				return -E_NOT_FOUND;
@@ -171,16 +173,20 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 					if(new_indirect < 0) 
 						return new_indirect;
 					f->f_indirect = new_indirect;
+
 					memset(diskaddr(new_indirect), 0, PGSIZE);
+					uint32_t* indirect_ptr = diskaddr(f->f_indirect);
+					*ppdiskbno = (indirect_ptr + (size_t) (filebno - 10));
 					flush_block(diskaddr(new_indirect));
+					return 0;
 				} else { 
 					return -E_NOT_FOUND;
 				}
+			} else {
+				uint32_t* indirect_ptr = diskaddr(f->f_indirect);
+				*ppdiskbno = (indirect_ptr + (size_t) (filebno - 10));
 			} 
-				
-			uint32_t* indirect_ptr = diskaddr(f->f_indirect);
-			uint32_t blockno = indirect_ptr[filebno - 10];
-			*ppdiskbno = &(f->f_direct[filebno]);
+
 		}
 
 		return 0;
@@ -197,16 +203,16 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
 	// LAB 5: Your code here.
-	uint32_t* ppdiskbno;
+	uint32_t* ppdiskbno = NULL;
 	int ret;
 	ret = file_block_walk(f, filebno, &ppdiskbno, 1);
-	cprintf("ret is %llx\n", ret);
 	if(ret < 0)
 		return ret;
 	if(*ppdiskbno == 0) {
 		ret = alloc_block();
 		if(ret < 0)
 			return ret;
+		memset(diskaddr(ret), 0, PGSIZE);
 		*ppdiskbno = ret;
 	}
 	*blk = diskaddr(*ppdiskbno);
@@ -234,7 +240,6 @@ dir_lookup(struct File *dir, const char *name, struct File **file)
 		if ((r = file_get_block(dir, i, &blk)) < 0)
 			return r;
 		f = (struct File*) blk;
-		cprintf("dir lookup blk is %llx\n", blk);
 		for (j = 0; j < BLKFILES; j++)
 			if (strcmp(f[j].f_name, name) == 0) {
 				*file = &f[j];
@@ -419,6 +424,7 @@ file_write(struct File *f, const void *buf, size_t count, off_t offset)
 	for (pos = offset; pos < offset + count; ) {
 		if ((r = file_get_block(f, pos / BLKSIZE, &blk)) < 0)
 			return r;
+
 		bn = MIN(BLKSIZE - pos % BLKSIZE, offset + count - pos);
 		memmove(blk + pos % BLKSIZE, buf, bn);
 		pos += bn;
@@ -477,11 +483,9 @@ file_truncate_blocks(struct File *f, off_t newsize)
 int
 file_set_size(struct File *f, off_t newsize)
 {
-	cprintf("before truncate %llx\n", f->f_direct[0]);
 	if (f->f_size > newsize)
 		file_truncate_blocks(f, newsize);
 	f->f_size = newsize;
-	cprintf("after truncate %llx\n", f->f_direct[0]);
 	flush_block(f);
 	return 0;
 }
@@ -495,13 +499,10 @@ file_flush(struct File *f)
 {
 	int i;
 	uint32_t *pdiskbno;
-	cprintf("file size is %llx\n", f->f_size);
 	for (i = 0; i < (f->f_size + BLKSIZE - 1) / BLKSIZE; i++) {
-		cprintf("are we here?\n");
 		if (file_block_walk(f, i, &pdiskbno, 0) < 0 ||
 		    pdiskbno == NULL || *pdiskbno == 0)
 			continue;
-		cprintf("pdiskbno is %llx\n", pdiskbno);
 		flush_block(diskaddr(*pdiskbno));
 	}
 	flush_block(f);

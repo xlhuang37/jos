@@ -82,10 +82,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 		if(r != 0 && r != (-E_IPC_NOT_RECV)){
 			panic("");
 		}
-		// counter += 1;
-		// if(counter == 50){
-		// 	sys_yield();
-		// }
+		sys_yield();
 	}
 }
 
