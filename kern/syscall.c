@@ -16,6 +16,7 @@
 #include <kern/syscall.h>
 #include <kern/console.h>
 #include <kern/sched.h>
+#include <kern/time.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -447,6 +448,7 @@ sys_ipc_recv(void *dstva)
 }
 
 
+
 // A personal function to bypass our bizarre design of 4 level page table..
 // Clearly the original MIT project is not designed to manage such a 4 levle page table..
 static int sys_get_pte_permission(void* va){
@@ -465,6 +467,15 @@ static int sys_get_pte_permission(void* va){
 	}
 	
 }
+
+// Return the current time.
+static int
+sys_time_msec(void)
+{
+	// LAB 6: Your code here.
+	panic("sys_time_msec not implemented");
+}
+
 
 
 static int sys_child_mmap(envid_t srcenvid, envid_t dstenvid){
