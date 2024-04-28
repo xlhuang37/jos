@@ -66,23 +66,23 @@ struct Trapframe {
 	struct PushRegs tf_regs;
 	uint16_t tf_es;
 	uint16_t tf_padding1;
-	uint32_t tf_padding2;
+	uint32_t tf_padding2; // 1
 	uint16_t tf_ds;
 	uint16_t tf_padding3;
-	uint32_t tf_padding4;
-	uint64_t tf_trapno;
+	uint32_t tf_padding4; // 2
+	uint64_t tf_trapno; // 3
 	/* below here defined by x86 hardware */
-	uint64_t tf_err;
-	uintptr_t tf_rip;
+	uint64_t tf_err; // 4
+	uintptr_t tf_rip; // 5
 	uint16_t tf_cs;
 	uint16_t tf_padding5;
-	uint32_t tf_padding6;
-	uint64_t tf_eflags;
+	uint32_t tf_padding6; // 6
+	uint64_t tf_eflags; // 7
 	/* below here only when crossing rings, such as from user to kernel */
-	uintptr_t tf_rsp;
+	uintptr_t tf_rsp; // 8
 	uint16_t tf_ss;
 	uint16_t tf_padding7;
-	uint32_t tf_padding8;
+	uint32_t tf_padding8; // 9
 } __attribute__((packed));
 
 struct UTrapframe {

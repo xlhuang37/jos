@@ -2,19 +2,25 @@
 
 #include <inc/string.h>
 #include <inc/lib.h>
-
+#include <inc/mmu.h>
+#include <inc/types.h>
 // PTE_COW marks copy-on-write page table entries.
 // It is one of the bits explicitly allocated to user processes (PTE_AVAIL).
 #define PTE_COW		0x800
+
+extern void _pgfault_upcall(void);
+
 
 //
 // Custom page fault handler - if faulting page is copy-on-write,
 // map in our own private writable copy.
 //
+
+
 static void
 pgfault(struct UTrapframe *utf)
 {
-	void *addr = (void *) utf->utf_fault_va;
+	void *addr = (void *) ROUNDDOWN(utf->utf_fault_va, PGSIZE);
 	uint32_t err = utf->utf_err;
 	int r;
 
@@ -23,6 +29,24 @@ pgfault(struct UTrapframe *utf)
 	// Hint:
 	//   Use the read-only page table mappings at uvpt
 	//   (see <inc/memlayout.h>).
+	
+	int permission = (uvpt[((int64_t)addr >> PGSHIFT)] & PTE_USER);
+
+	// The following section is the intended permission checking scheme
+	// Through self referencing, you will be able to trick page table into giving you 
+	// the pte, pde, pdpe, even though all of them should be "hidden," 
+	// and only pml4e is visible at UVPT. 
+	// To see the mechanicism behind this trick, see https://os.phil-opp.com/page-tables/
+	// CODE:
+	// int64_t permission_2 = uvpt[((int64_t)addr >> PGSHIFT)];
+	// cprintf("permission 2 is hey yeah %llx\n", permission_2);
+	// cprintf("permission is hey yeah %llx\n", permission);
+
+	if(!(permission & PTE_COW) 
+		|| !(err & PTE_W)){
+			cprintf("faulting addr is %llx\n", addr);
+			panic("not a write or COW\n");
+		}
 
 	// LAB 4: Your code here.
 
@@ -34,8 +58,11 @@ pgfault(struct UTrapframe *utf)
 	//   No need to explicitly delete the old page's mapping.
 
 	// LAB 4: Your code here.
-
-	panic("pgfault not implemented");
+	sys_page_alloc(0, PFTEMP, PTE_P|PTE_W|PTE_U);
+	memmove(PFTEMP, addr, PGSIZE);
+	sys_page_map(0, PFTEMP, 0, addr, PTE_P|PTE_W|PTE_U);
+	sys_page_unmap(0, PFTEMP);
+	return;
 }
 
 //
@@ -50,13 +77,26 @@ pgfault(struct UTrapframe *utf)
 // It is also OK to panic on error.
 //
 static int
-duppage(envid_t envid, unsigned pn)
+duppage(envid_t envid, void* addr, int permission)
 {
-	int r;
-
-	// LAB 4: Your code here.
-	panic("duppage not implemented");
-	return 0;
+	int r = 0;
+	if(permission & PTE_SHARE) {
+		r = sys_page_map(0, addr, envid, addr, (permission & PTE_USER));
+	}
+	else if((permission & PTE_COW) 
+		||(permission & PTE_W)){
+			r = sys_page_map(0, addr, envid, addr, PTE_P|PTE_U|PTE_COW);
+			if(r != 0)
+				panic("");
+			r = sys_page_map(envid, addr, 0, addr, PTE_P|PTE_U|PTE_COW);
+			if(r != 0)
+				panic("");
+	} else {
+		r = sys_page_map(0, addr, envid, addr, PTE_P|PTE_U);
+		if(r != 0)
+			panic("");
+	}
+	return r;
 }
 
 //
@@ -78,8 +118,57 @@ duppage(envid_t envid, unsigned pn)
 envid_t
 fork(void)
 {
+	envid_t envid;
+	int r;
+	extern unsigned char end[];
 	// LAB 4: Your code here.
-	panic("fork not implemented");
+	set_pgfault_handler(pgfault);
+	envid = sys_exofork();
+	
+	if (envid < 0)
+		panic("sys_exofork: %e", envid);
+	else if (envid == 0) {
+		// We're the child.
+		// The copied value of the global variable 'thisenv'
+		// is no longer valid (it refers to the parent!).
+		// Fix it and return 0.
+		thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+	else {
+	// we are the parents
+	// int r = sys_child_mmap(0, envid);
+	// if(r != 0){
+	// 	panic("");
+	// }
+	int64_t curr_addr = (int64_t)0x0LL;
+	while(curr_addr < UTOP && curr_addr != (UXSTACKTOP - PGSIZE)){
+		if(!(uvpml4e[VPML4E(curr_addr)] & (PTE_P))) { 
+			curr_addr += PGSIZE;
+			continue;
+		} else if(!(uvpde[VPDPE(curr_addr)] & (PTE_P))) {
+			curr_addr += PGSIZE;
+			continue;
+		} else if(!(uvpd[VPD(curr_addr)] & (PTE_P))) {
+			curr_addr += PGSIZE;
+			continue;
+		} else if (!(uvpt[(curr_addr >> PGSHIFT)] & (PTE_P|PTE_U))) {
+			curr_addr += PGSIZE;
+			continue;
+		} else {
+			int permission = (uvpt[(curr_addr >> PGSHIFT)] & PTE_USER);
+			if(duppage(envid, (void*)curr_addr, permission)!= 0) panic("");
+		}
+		curr_addr += PGSIZE;
+	}
+	int permission = (uvpt[((USTACKTOP - PGSIZE) >> PGSHIFT)] & PTE_USER);
+	sys_page_alloc(envid, (void*)(UXSTACKTOP - PGSIZE), PTE_P|PTE_W|PTE_U);
+	if(sys_env_set_pgfault_upcall(envid, _pgfault_upcall)!=0)
+		panic("setting fault upcall is having errors");
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0)
+		panic("sys_env_set_status: %e", r);
+	return envid;
+    }
 }
 
 // Challenge!

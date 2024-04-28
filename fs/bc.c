@@ -48,15 +48,22 @@ bc_pgfault(struct UTrapframe *utf)
 	// Hint: first round addr to page boundary.
 	//
 	// LAB 5: your code here:
+	int ret = sys_page_alloc(thisenv->env_id, (void*)ROUNDDOWN((int64_t)addr, PGSIZE), PTE_U | PTE_P | PTE_W);
+	if(ret < 0) { 
+		panic("");
+	}
 
 
 
 	// LAB 5: Your code here
+	ret = ide_read(blockno * BLKSECTS, (void*)ROUNDDOWN((int64_t)addr, PGSIZE), BLKSECTS);
+	if(ret < 0) { 
+		panic("");
+	}
 
 
 	if ((r = sys_page_map(0, addr, 0, addr, uvpt[PGNUM(addr)] & PTE_SYSCALL)) < 0)
 		panic("in bc_pgfault, sys_page_map: %e", r);
-
 	// Check that the block we read was allocated. (exercise for
 	// the reader: why do we do this *after* reading the block
 	// in?)
@@ -80,7 +87,19 @@ flush_block(void *addr)
 		panic("flush_block of bad va %08x", addr);
 
 	// LAB 5: Your code here.
-	panic("flush_block not implemented");
+	if(!va_is_mapped(addr)) {
+		return;
+	} 
+	if(!va_is_dirty(addr)) {
+		return;
+	}
+	int r = ide_write(blockno * BLKSECTS, (void*)ROUNDDOWN((int64_t)addr, PGSIZE), BLKSECTS);
+	if(r != 0)
+		panic("%e", r);
+	int64_t permission = uvpt[((int64_t)addr >> PGSHIFT)] & 0xFFFLL;
+	r = sys_page_map(0, (void*)ROUNDDOWN((int64_t)addr, PGSIZE), 0, (void*)ROUNDDOWN((int64_t)addr, PGSIZE), permission & PTE_SYSCALL);
+	if(r != 0)
+		panic("%e", r);
 }
 
 // Test that the block cache works, by smashing the superblock and
@@ -89,7 +108,6 @@ static void
 check_bc(void)
 {
 	struct Super backup;
-
 	// back up super block
 	memmove(&backup, diskaddr(1), sizeof backup);
 

@@ -85,11 +85,9 @@ spawn(const char *prog, const char **argv)
 	//     correct initial rip and rsp values in the child.
 	//
 	//   - Start the child process running with sys_env_set_status().
-
 	if ((r = open(prog, O_RDONLY)) < 0)
 		return r;
 	fd = r;
-
 	// Read elf header
 	elf = (struct Elf*) elf_buf;
 	if (readn(fd, elf_buf, sizeof(elf_buf)) != sizeof(elf_buf)
@@ -98,20 +96,16 @@ spawn(const char *prog, const char **argv)
 		cprintf("elf magic %08x want %08x\n", elf->e_magic, ELF_MAGIC);
 		return -E_NOT_EXEC;
 	}
-
 	// Create new child environment
 	if ((r = sys_exofork()) < 0)
 		return r;
 	child = r;
-
 	// Set up trap frame, including initial stack.
 	child_tf = envs[ENVX(child)].env_tf;
 	child_tf.tf_rip = elf->e_entry;
-
 	if ((r = init_stack(child, argv, &init_rsp)) < 0)
 		return r;
 	child_tf.tf_rsp = init_rsp;
-
 	// Set up program segments as defined in ELF header.
 	ph = (struct Proghdr*) (elf_buf + elf->e_phoff);
 	for (i = 0; i < elf->e_phnum; i++, ph++) {
@@ -136,7 +130,6 @@ spawn(const char *prog, const char **argv)
 
 	if ((r = sys_env_set_status(child, ENV_RUNNABLE)) < 0)
 		panic("sys_env_set_status: %e", r);
-
 	return child;
 
 error:
@@ -173,6 +166,7 @@ spawnl(const char *prog, const char *arg0, ...)
 	for(i=0;i<argc;i++)
 		argv[i+1] = va_arg(vl, const char *);
 	va_end(vl);
+
 	return spawn(prog, argv);
 }
 
@@ -303,6 +297,30 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+	sys_page_alloc(thisenv->env_id, (void*)(UXSTACKTOP - PGSIZE), PTE_P|PTE_W|PTE_U);
+	int64_t curr_addr = (int64_t)0x0LL;
+	while(curr_addr < UTOP && curr_addr != (UXSTACKTOP - PGSIZE) ){
+		if(!(uvpml4e[VPML4E(curr_addr)] & (PTE_P))) { 
+			curr_addr += PGSIZE;
+			continue;
+		} else if(!(uvpde[VPDPE(curr_addr)] & (PTE_P))) {
+			curr_addr += PGSIZE;
+			continue;
+		} else if(!(uvpd[VPD(curr_addr)] & (PTE_P))) {
+			curr_addr += PGSIZE;
+			continue;
+		} else if (!(uvpt[(curr_addr >> PGSHIFT)] & (PTE_SHARE))
+			|| !(uvpt[(curr_addr >> PGSHIFT)] & (PTE_U))
+		) {
+			curr_addr += PGSIZE;
+			continue;
+		} else {
+			int permission = (uvpt[(curr_addr >> PGSHIFT)] & PTE_USER);
+			sys_page_map(0, (void*)curr_addr, child, (void*)curr_addr, permission);
+		}
+		curr_addr += PGSIZE;
+	}
 	return 0;
 }
+
 

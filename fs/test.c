@@ -47,7 +47,6 @@ fs_test(void)
 	file_flush(f);
 	assert(!(uvpt[PGNUM(blk)] & PTE_D));
 	cprintf("file_flush is good\n");
-
 	if ((r = file_set_size(f, 0)) < 0)
 		panic("file_set_size: %e", r);
 	assert(f->f_direct[0] == 0);
@@ -56,6 +55,7 @@ fs_test(void)
 
 	if ((r = file_set_size(f, strlen(msg))) < 0)
 		panic("file_set_size 2: %e", r);
+	cprintf("new size for f! %llx\n", f->f_size);
 	assert(!(uvpt[PGNUM(f)] & PTE_D));
 	if ((r = file_get_block(f, 0, &blk)) < 0)
 		panic("file_get_block 2: %e", r);
