@@ -341,11 +341,11 @@ x64_vm_init(void)
 	boot_map_region(boot_pml4e, KERNBASE, npages*PGSIZE, 0, 0x3);
 
 
-	// check_page_free_list(1);
-	// check_page_alloc();
-	// page_check();
-	// check_page_free_list(0);
-	// check_boot_pml4e(boot_pml4e);
+	check_page_free_list(1);
+	check_page_alloc();
+	page_check();
+	check_page_free_list(0);
+	check_boot_pml4e(boot_pml4e);
 
 
 
@@ -857,7 +857,7 @@ mmio_map_region(physaddr_t pa, size_t size)
 	void* reserved_base =  (void*) base;
 	base += ROUNDUP(size, PGSIZE);
 
-	return (void*) reserved_base;
+	return reserved_base;
 }
 
 static uintptr_t user_mem_check_addr;

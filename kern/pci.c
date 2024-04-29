@@ -3,9 +3,11 @@
 #include <inc/string.h>
 #include <kern/pci.h>
 #include <kern/pcireg.h>
+#include <kern/pmap.h>
+#include <kern/e1000.h>
 
 // Flag to do "lspci" at bootup
-static int pci_show_devs = 1;
+static int pci_show_devs = 0;
 static int pci_show_addrs = 0;
 
 // PCI "configuration mechanism one"
@@ -14,6 +16,11 @@ static uint32_t pci_conf1_data_ioport = 0x0cfc;
 
 // Forward declarations
 static int pci_bridge_attach(struct pci_func *pcif);
+static int pci_e1000_attach(struct pci_func *pcif);
+
+//
+volatile uint32_t*  e1000_viraddr;
+volatile struct tx_desc* td_base;
 
 // PCI driver table
 struct pci_driver {
@@ -28,7 +35,7 @@ struct pci_driver pci_attach_class[] = {
 };
 
 // pci_attach_vendor matches the vendor ID and device ID of a PCI device
-struct pci_driver pci_attach_vendor[] = {
+struct pci_driver pci_attach_vendor[] = { {0x8086, 0x100E, &pci_e1000_attach},
 	{ 0, 0, 0 },
 };
 
@@ -181,6 +188,57 @@ pci_bridge_attach(struct pci_func *pcif)
 			(busreg >> PCI_BRIDGE_BUS_SUBORDINATE_SHIFT) & 0xff);
 
 	pci_scan_bus(&nbus);
+	return 1;
+}
+
+static int
+pci_e1000_attach(struct pci_func *pcif)
+{
+	// Enables the device; set pcif->reg_base[0], pcif->reg_size[0] physical address. 
+	pci_func_enable(pcif);
+	// Memory Map the physical address into MMIO
+	e1000_viraddr = mmio_map_region(pcif->reg_base[0], pcif->reg_size[0]);
+	// testing device status register
+	if(e1000_viraddr[2] != 0x80080783) {
+		panic("mmio error, something got fucked\n");
+	}
+	// Transmit Initialization, see 14.5 in Intel's manual
+	// Allocate Memory; its reference count is not updated.
+	// If more than one page, MAKE SURE THEY ARE CONTIGUOUS!
+	struct PageInfo* tdring_page = page_alloc(1);
+	physaddr_t phyaddr = page2pa(tdring_page);
+	page_insert(boot_pml4e, tdring_page, (void*) E1000_TDBASE, PTE_P|PTE_W); // Only kernel should have access
+	// Map into virtual Address
+	for(int i = 0; i < TD_MAX; i++){
+		struct PageInfo* new_packet_page = page_alloc(1);
+		page_insert(boot_pml4e, new_packet_page, (void*) (E1000_PACKET + i*4096), PTE_P|PTE_W); // Only kernel should have access
+	}
+	// We support a maximum of 64 Transmit Descriptors as required by Auto Grader.
+	*(volatile int*)(e1000_viraddr + E1000_TDBAL) = phyaddr;
+	*(volatile int*)(e1000_viraddr + E1000_TDLEN) = TD_MAX * TD_SIZE;
+	*(volatile int*)(e1000_viraddr + E1000_TDH) = 0;
+	*(volatile int*)(e1000_viraddr + E1000_TDT) = 0;
+	// Set up TCTL; TCTL register is at 0x400 from Base
+	// 
+	*(volatile int*)(e1000_viraddr + E1000_TCTL) = 
+		*(volatile int*)(e1000_viraddr + E1000_TCTL) 
+		| E1000_TCTL_EN  // set bit to 1 according to manual
+		| E1000_TCTL_PSP // Set bit to 1 according to manual 
+		| 0x00000100     // E1000_TCTL_CT  0x00000ff0  collision threshold , ff means that 8 bits are for this configuration, set to 10 by standard
+		| 0x00200000;    // E1000_TCTL_COLD, assume full duplex.
+
+	
+	*(volatile int*)(e1000_viraddr + E1000_TIPG) =  
+		(6 << 20)    // IPGR2 is set to 6 by 802.3 Standard
+		+ (4 << 10)  // IPGR1 is set to 2/3 of IPGR2, which is 4
+		+ (10);      // IPGT is set to 10
+
+
+	// struct PageInfo* a = page_alloc(1);
+	// page_insert(boot_pml4e, a, (void*) E1000_TDBASE - 0x8000, PTE_P|PTE_W); // Only kernel should have access
+	// int r = transmit_packet((void*) (E1000_TDBASE - 0x8000), PGSIZE);
+	// cprintf("oh i returned %llx\n", r);
+	
 	return 1;
 }
 

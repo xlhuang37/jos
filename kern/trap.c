@@ -209,6 +209,8 @@ trap_dispatch(struct Trapframe *tf)
 		// LAB 4: Your code here.
 		case (IRQ_OFFSET + IRQ_TIMER):
 			lapic_eoi();
+			// Lab 6: Increment Time Tick
+			time_tick();
 			sched_yield();
 			break;
 		case (IRQ_OFFSET + IRQ_KBD):
