@@ -1,2 +1,2 @@
 git@github.com:comp630-s24/jos-labs-alien.git
-lab5
+lab6a
