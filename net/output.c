@@ -12,6 +12,10 @@ output(envid_t ns_envid)
     //	- send the packet to the device driver
     while(true){ 
         sys_ipc_recv(&nsipcbuf);
+        // cprintf("%llx\n", thisenv->env_ipc_value);
+        // cprintf("%llx\n", NSREQ_OUTPUT);
+        if(thisenv->env_ipc_value != NSREQ_OUTPUT)
+            continue;
         sys_send_packet((void*)nsipcbuf.pkt.jp_data, nsipcbuf.pkt.jp_len);
     }
     

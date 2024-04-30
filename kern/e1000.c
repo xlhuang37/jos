@@ -9,10 +9,10 @@
 // LAB 6: Your driver code here
 int transmit_packet(void* buffer, int length) {
     int tail = *(volatile int*)((int64_t)e1000_viraddr + E1000_TDT);
-    cprintf("tail is %llx\n", tail);
+
     volatile struct tx_desc* tdbase = ((volatile struct tx_desc*)(E1000_TDBASE_TRANSMIT));
     struct tx_desc td = tdbase[tail];
-    cprintf("buffer contains %llx\n", *(int64_t*)(buffer));
+
     while(true){
         if(td.cmd & (1 << 3)) {
             if(td.status & (1 << 0)) {
@@ -50,13 +50,24 @@ int receive_packet(void* buffer) {
     // cprintf("tail is %llx\n", tail);
     volatile struct rx_desc* rdbase = ((volatile struct rx_desc*)(E1000_TDBASE_RECEIVE));
     struct rx_desc rd = rdbase[curr];
-    // cprintf("addr of buffer is %llx\n", buffer);
-    // cprintf("addr of receive side is %llx\n", rd.addr);
 
-    // if the memory is owned by hardware, software CANNOT access it
+    // if the memory is owned by hardware, software should not access it
+    // which is why I GOT F U C K I N G   P A G E F A U L T S
+    // Actually maybe not
+    // hardware does not seem to be enforcing such restrictions
+    // it shouldn't have ways to
+    // Test:
+    // struct rx_desc test = rdbase[0];
+    // cprintf("addr of receive side is %llx\n", test.addr);
+
+    // Test2:
+    // Print to see access to receive_packet
+    // cprintf("\n");
+    
     if((rd.status & (1 << 0)) ) {
         memcpy(buffer, (void*)(E1000_PACKET_RECEIVE + curr * PGSIZE), rd.length);
-        rd.status &= (~(3 << 0));
+        memset((void*)(E1000_PACKET_RECEIVE + curr * PGSIZE), 0, PGSIZE);
+        rd.status &= (~(1 << 0));
     } else {
         return -99;
     } 

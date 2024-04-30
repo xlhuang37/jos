@@ -139,7 +139,10 @@ def test_testinput_helper(count):
         # Send 'count' UDP packets
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.connect(("127.0.0.1", echo_port))
+        # Max Receive Descriptor Count is 16 in Ring Buffer
         for i in range(count):
+            if(i%16 == 0):
+                time.sleep(1)
             sock.send(ascii_to_bytes("Packet %03d" % i))
     send_thread = threading.Thread(target=send_packets)
 

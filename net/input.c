@@ -22,7 +22,6 @@ input(envid_t ns_envid)
         while(true) {
             r = sys_receive_packet((void*)(0x408000));
             if(r == -99){
-                sys_yield();
                 continue;
             } else if(r >= 0) {
                 break;
@@ -30,7 +29,6 @@ input(envid_t ns_envid)
                 panic("");
             }      
         }
-
         sys_page_alloc(thisenv->env_id, &nsipcbuf, PTE_P|PTE_W|PTE_U);
 
         memmove(nsipcbuf.pkt.jp_data, (void*)(0x408000), r);
@@ -41,8 +39,6 @@ input(envid_t ns_envid)
         // probably maybe i don't need the following; new allocation is on different physical page everytime?
         // but the returned page is always first on the list..
         // for better robustness, maybe use sys_time
-        for(int i = 0; i < 10; i++){
-            sys_yield();
-        }
+        sys_yield();
     }  
 }
