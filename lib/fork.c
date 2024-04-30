@@ -41,9 +41,7 @@ pgfault(struct UTrapframe *utf)
 	// int64_t permission_2 = uvpt[((int64_t)addr >> PGSHIFT)];
 	// cprintf("permission 2 is hey yeah %llx\n", permission_2);
 	// cprintf("permission is hey yeah %llx\n", permission);
-
-	if(!(permission & PTE_COW) 
-		|| !(err & PTE_W)){
+	if(!((permission & PTE_COW) || (err & PTE_W))){
 			cprintf("faulting addr is %llx\n", addr);
 			panic("not a write or COW\n");
 		}

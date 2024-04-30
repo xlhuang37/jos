@@ -21,10 +21,13 @@ umain(int argc, char **argv)
     if (output_envid < 0)
         panic("error forking");
     else if (output_envid == 0) {
+        // for child, ns_envid is parent;
+        // for child, it does not have its own id
         output(ns_envid);
         return;
     }
-
+    // For parent, output_envid is the child
+    // For parent, ns_envid is its own env_id
     for (i = 0; i < TESTOUTPUT_COUNT; i++) {
         if ((r = sys_page_alloc(0, pkt, PTE_P|PTE_U|PTE_W)) < 0)
             panic("sys_page_alloc: %e", r);
@@ -32,6 +35,7 @@ umain(int argc, char **argv)
                 PGSIZE - sizeof(pkt->jp_len),
                 "Packet %02d", i);
         cprintf("Transmitting packet %d\n", i);
+        cprintf("%s %llx %llx\n", (pkt->jp_data), pkt->jp_len, pkt);
         ipc_send(output_envid, NSREQ_OUTPUT, pkt, PTE_P|PTE_W|PTE_U);
         sys_page_unmap(0, pkt);
     }

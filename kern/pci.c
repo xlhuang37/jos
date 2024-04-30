@@ -20,7 +20,8 @@ static int pci_e1000_attach(struct pci_func *pcif);
 
 //
 volatile uint32_t*  e1000_viraddr;
-volatile struct tx_desc* td_base;
+volatile physaddr_t ring_buffers[TD_MAX];
+volatile physaddr_t ring_buffers_receive[RD_MAX];
 
 // PCI driver table
 struct pci_driver {
@@ -199,7 +200,7 @@ pci_e1000_attach(struct pci_func *pcif)
 	// Memory Map the physical address into MMIO
 	e1000_viraddr = mmio_map_region(pcif->reg_base[0], pcif->reg_size[0]);
 	// testing device status register
-	if(e1000_viraddr[2] != 0x80080783) {
+	if(*(volatile int*)((int64_t)e1000_viraddr + 0x8) != 0x80080783) {
 		panic("mmio error, something got fucked\n");
 	}
 	// Transmit Initialization, see 14.5 in Intel's manual
@@ -207,37 +208,80 @@ pci_e1000_attach(struct pci_func *pcif)
 	// If more than one page, MAKE SURE THEY ARE CONTIGUOUS!
 	struct PageInfo* tdring_page = page_alloc(1);
 	physaddr_t phyaddr = page2pa(tdring_page);
-	page_insert(boot_pml4e, tdring_page, (void*) E1000_TDBASE, PTE_P|PTE_W); // Only kernel should have access
+	page_insert(boot_pml4e, tdring_page, (void*) E1000_TDBASE_TRANSMIT, PTE_P|PTE_W); // Only kernel should have access
 	// Map into virtual Address
 	for(int i = 0; i < TD_MAX; i++){
 		struct PageInfo* new_packet_page = page_alloc(1);
+		ring_buffers[i] = page2pa(new_packet_page);
 		page_insert(boot_pml4e, new_packet_page, (void*) (E1000_PACKET + i*4096), PTE_P|PTE_W); // Only kernel should have access
 	}
+	// PACKET TRANSMISSION INITIALIZATION
 	// We support a maximum of 64 Transmit Descriptors as required by Auto Grader.
-	*(volatile int*)(e1000_viraddr + E1000_TDBAL) = phyaddr;
-	*(volatile int*)(e1000_viraddr + E1000_TDLEN) = TD_MAX * TD_SIZE;
-	*(volatile int*)(e1000_viraddr + E1000_TDH) = 0;
-	*(volatile int*)(e1000_viraddr + E1000_TDT) = 0;
+	*(volatile int64_t*)((int64_t)e1000_viraddr + E1000_TDBAL) = phyaddr;
+	*(volatile int*)((int64_t)e1000_viraddr + E1000_TDLEN) = TD_MAX * TD_SIZE;
+	*(volatile int*)((int64_t)e1000_viraddr + E1000_TDH) = 0;
+	*(volatile int*)((int64_t)e1000_viraddr + E1000_TDT) = 0;
 	// Set up TCTL; TCTL register is at 0x400 from Base
-	// 
-	*(volatile int*)(e1000_viraddr + E1000_TCTL) = 
-		*(volatile int*)(e1000_viraddr + E1000_TCTL) 
+	*(volatile int*)((int64_t)e1000_viraddr + E1000_TCTL) = 
+		*(volatile int*)((int64_t)e1000_viraddr + E1000_TCTL) 
 		| E1000_TCTL_EN  // set bit to 1 according to manual
 		| E1000_TCTL_PSP // Set bit to 1 according to manual 
 		| 0x00000100     // E1000_TCTL_CT  0x00000ff0  collision threshold , ff means that 8 bits are for this configuration, set to 10 by standard
 		| 0x00200000;    // E1000_TCTL_COLD, assume full duplex.
 
-	
-	*(volatile int*)(e1000_viraddr + E1000_TIPG) =  
+	*(volatile int*)((int64_t)e1000_viraddr + E1000_TIPG) =  
 		(6 << 20)    // IPGR2 is set to 6 by 802.3 Standard
 		+ (4 << 10)  // IPGR1 is set to 2/3 of IPGR2, which is 4
 		+ (10);      // IPGT is set to 10
 
 
-	// struct PageInfo* a = page_alloc(1);
-	// page_insert(boot_pml4e, a, (void*) E1000_TDBASE - 0x8000, PTE_P|PTE_W); // Only kernel should have access
-	// int r = transmit_packet((void*) (E1000_TDBASE - 0x8000), PGSIZE);
-	// cprintf("oh i returned %llx\n", r);
+	// PACKET RECEIVE INITIALIZATION
+	struct PageInfo* tdring_page_receive = page_alloc(1);
+	physaddr_t phyaddr_receive = page2pa(tdring_page_receive);
+	page_insert(boot_pml4e, tdring_page_receive, (void*) E1000_TDBASE_RECEIVE, PTE_P|PTE_W); // Only kernel should have access
+	struct rx_desc* rds = (struct rx_desc*) E1000_TDBASE_RECEIVE;
+
+	for(int i = 0; i < RD_MAX; i++){
+		struct PageInfo* new_receive_page = page_alloc(1);
+		rds[i].addr = page2pa(new_receive_page);
+		page_insert(boot_pml4e, new_receive_page, (void*) (E1000_PACKET_RECEIVE + i*4096), PTE_P|PTE_W); // Only kernel should have access
+	}
+
+	*(volatile int64_t*)((int64_t)e1000_viraddr + E1000_RA) = 
+	(0x52ll) 
+	| (0x54ll << 8)
+	| (0x00ll << 16)
+	| (0x12ll << 24)
+	| (0x34ll << 32)
+	| (0x56ll << 40)
+	| ((int64_t)E1000_RAH_AV << 32);
+	*(volatile int64_t*)((int64_t)e1000_viraddr + E1000_RDBAL) = phyaddr_receive;
+	*(volatile int*)((int64_t)e1000_viraddr + E1000_RDLEN) = RD_MAX * RD_SIZE;
+	*(volatile int*)((int64_t)e1000_viraddr + E1000_RDH) = 5;
+	// If H == T, the whole thing just shut down.
+	*(volatile int*)((int64_t)e1000_viraddr + E1000_RDT) = 4;
+	*(volatile int*)((int64_t)e1000_viraddr + E1000_MTA) = 0;
+	// *(volatile int*)((int64_t)e1000_viraddr + E1000_IMS) = 
+	// 	*(volatile int*)((int64_t)e1000_viraddr + E1000_IMS) 
+	// 	| E1000_IMS_RXT0 
+	// 	| E1000_IMS_RXO 
+	// 	| E1000_IMS_RXDMT0  
+	// 	| E1000_IMS_RXSEQ 
+	// 	| E1000_IMS_LSC;    
+
+	// Put this to last, can only be enabled after receive ring is initialized and ready
+	*(volatile int*)((int64_t)e1000_viraddr + E1000_RCTL) = 
+		(*(volatile int*)((int64_t)e1000_viraddr + E1000_RCTL) 
+		| E1000_RCTL_EN    // set bit to 1 according to manual
+		| E1000_RCTL_BAM    // allow broadcast
+		| E1000_RCTL_BSEX
+		| E1000_RCTL_SZ_4096
+		| E1000_RCTL_SECRC) 
+		& (~0x00000C00)
+		& (~E1000_RCTL_LPE);
+	// cprintf("%llx %llx", E1000_RCTL, *(volatile int*)((int64_t)e1000_viraddr + E1000_RCTL));
+	// panic("");
+
 	
 	return 1;
 }

@@ -17,6 +17,7 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 #include <kern/time.h>
+#include <kern/e1000.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -301,7 +302,7 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	} else{
 		return 0;
 	}
-	panic("sys_page_map not implemented");
+
 }
 
 // Unmap the page of memory at 'va' in the address space of 'envid'.
@@ -520,6 +521,24 @@ static int sys_child_mmap(envid_t srcenvid, envid_t dstenvid){
 	return 0;
 }
 
+static int sys_send_packet(void* buffer, int length) {
+	// if((int64_t)buffer %4096!=0){
+	// 	return -E_INVAL;
+	// } else if((int64_t)buffer > UTOP) {
+	// 	return -E_INVAL;
+	// }
+	return transmit_packet(buffer, length);
+}
+
+static int sys_receive_packet(void* buffer) {
+	// if((int64_t)buffer %4096!=0){
+	// 	return -E_INVAL;
+	// } else if((int64_t)buffer > UTOP) {
+	// 	return -E_INVAL;
+	// }
+	return receive_packet(buffer);
+}
+
 
 // Dispatches to the correct kernel function, passing the arguments.
 int64_t
@@ -566,6 +585,12 @@ syscall(uint64_t syscallno, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, 
 			return sys_env_set_trapframe(a1, (void*)a2);
 		case SYS_time_msec:
 			return sys_time_msec();
+		case SYS_send_packet:
+			user_mem_assert((struct Env*)curenv, (void*)a1, a2, PTE_U);
+			return sys_send_packet((void*) a1, a2);
+		case SYS_receive_packet:
+			// user_mem_assert((struct Env*)curenv, (void*)a1, a2, PTE_U);
+			return sys_receive_packet((void*) a1);
 		default:
 			return -E_INVAL;
 		}

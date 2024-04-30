@@ -2,7 +2,7 @@
 #define JOS_KERN_PCI_H
 
 #include <inc/types.h>
-
+#include <kern/e1000.h>
 // PCI subsystem interface
 enum { pci_res_bus, pci_res_mem, pci_res_io, pci_res_max };
 
@@ -32,5 +32,6 @@ void pci_func_enable(struct pci_func *f);
 
 // With Love, personal variable definitions
 extern volatile uint32_t * e1000_viraddr;
-
+extern volatile physaddr_t ring_buffers[TD_MAX];
+extern volatile physaddr_t ring_buffers_receive[RD_MAX];
 #endif

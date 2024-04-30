@@ -20,6 +20,8 @@ enum {
 	SYS_get_pte_permission,
 	SYS_child_mmap,
 	SYS_time_msec,
+	SYS_send_packet,
+	SYS_receive_packet,
 	NSYSCALLS
 };
 

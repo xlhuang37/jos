@@ -39,6 +39,7 @@ announce(void)
     memset(arp->dhwaddr.addr,  0x00,  ETHARP_HWADDR_LEN);
     memcpy(arp->dipaddr.addrw, &gwip, 4);
 
+
     ipc_send(output_envid, NSREQ_OUTPUT, pkt, PTE_P|PTE_W|PTE_U);
     sys_page_unmap(0, pkt);
 }
@@ -96,6 +97,7 @@ umain(int argc, char **argv)
         int perm;
 
         int32_t req = ipc_recv((int32_t *)&whom, pkt, &perm);
+
         if (req < 0)
             panic("ipc_recv: %e", req);
         if (whom != input_envid)
