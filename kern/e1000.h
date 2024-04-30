@@ -36,7 +36,7 @@
 #define TD_MAX         16       /* Maximum number of TX Descriptor */
 #define TD_SIZE        16       /* Each TD has 16 bytes */
 // Yeah Hacking here. Sorry. The problem is that the head register isn't moving. IDK why. Double Checked everything.
-#define RD_MAX         16       /* Maximum number of TX Descriptor */
+#define RD_MAX         128      /* Maximum number of TX Descriptor */
 #define RD_SIZE        16       /* Each TD has 16 bytes */
 
 /* Transmit Control Registers Address */
