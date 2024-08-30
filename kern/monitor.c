@@ -12,6 +12,7 @@
 #include <kern/dwarf.h>
 #include <kern/kdebug.h>
 #include <kern/dwarf_api.h>
+#include <kern/trap.h>
 
 #define CMDBUF_SIZE	80	// enough for one VGA text line
 
@@ -62,47 +63,47 @@ mon_kerninfo(int argc, char **argv, struct Trapframe *tf)
 int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
-    uint64_t* rbp;
-    uint64_t* rip;
-    uint64_t* rsp;
-    uint64_t size = (uint64_t)sizeof(struct Ripdebuginfo);
+    // uint64_t* rbp;
+    // uint64_t* rip;
+    // uint64_t* rsp;
+    // uint64_t size = (uint64_t)sizeof(struct Ripdebuginfo);
 
-    // I thought I could allocate memory by moving rsp register. I cannot.
-    // So let's just use random unused memory.
-    struct Ripdebuginfo* info;
-    info = (struct Ripdebuginfo*) 0x00400000;
+    // // I thought I could allocate memory by moving rsp register. I cannot.
+    // // So let's just use random unused memory.
+    // struct Ripdebuginfo* info;
+    // info = (struct Ripdebuginfo*) 0x8004000000;
 
-    cprintf("Stack backtrace:\n");
-    __asm__ ("mov %%rsp, %0;" : "=r"(rsp));
-    __asm__ ("mov %%rbp, %0;" : "=r"(rbp));
-    __asm__ volatile (
-        "call next_instr\n"
-        "next_instr:\n"
-        " pop %0\n"
-        : "=r"(rip)
-    );
+    // cprintf("Stack backtrace:\n");
+    // __asm__ ("mov %%rsp, %0;" : "=r"(rsp));
+    // __asm__ ("mov %%rbp, %0;" : "=r"(rbp));
+    // __asm__ volatile (
+    //     "call next_instr\n"
+    //     "next_instr:\n"
+    //     " pop %0\n"
+    //     : "=r"(rip)
+    // );
 
-    while(rbp){
-        cprintf("  rbp %016llx  rip %016llx\n", rbp, rip);
-        debuginfo_rip((uintptr_t)rip, info);
-        cprintf("      %s:%d: %s+%016llx  args:%d "
-        , info->rip_file, info->rip_line, info->rip_fn_name
-        ,(uint64_t)rip - (uint64_t)info->rip_fn_addr, info->rip_fn_narg);
+    // while(rbp){
+    //     cprintf("  rbp %016llx  rip %016llx\n", rbp, rip);
+    //     debuginfo_rip((uintptr_t)rip, info);
+    //     cprintf("      %s:%d: %s+%016llx  args:%d "
+    //     , info->rip_file, info->rip_line, info->rip_fn_name
+    //     ,(uint64_t)rip - (uint64_t)info->rip_fn_addr, info->rip_fn_narg);
         
-		// cprintf("\nCFA offset = %d\n", (signed long long)info->offset_fn_arg[0] 
-		// 		+ (signed long long)info->reg_table.cfa_rule.dw_offset);
-		// cprintf("\nargument offset = %d\n", (signed long long)info->offset_fn_arg[0]);
+	// 	// cprintf("\nCFA offset = %d\n", (signed long long)info->offset_fn_arg[0] 
+	// 	// 		+ (signed long long)info->reg_table.cfa_rule.dw_offset);
+	// 	// cprintf("\nargument offset = %d\n", (signed long long)info->offset_fn_arg[0]);
 		
-        for(int i = info->rip_fn_narg - 1; i >= 0; i--){
-            cprintf(" %016llx",  *(int*)(
-				(signed long long)rbp 
-				+ (signed long long)info->offset_fn_arg[i] 
-				+ (signed long long)info->reg_table.cfa_rule.dw_offset));
-        }
-        cprintf("\n");
-        rip = (uint64_t*) *(rbp+1);
-        rbp = (uint64_t*) *(rbp);
-    }
+    //     for(int i = info->rip_fn_narg - 1; i >= 0; i--){
+    //         cprintf(" %016llx",  *(int*)(
+	// 			(signed long long)rbp 
+	// 			+ (signed long long)info->offset_fn_arg[i] 
+	// 			+ (signed long long)info->reg_table.cfa_rule.dw_offset));
+    //     }
+    //     cprintf("\n");
+    //     rip = (uint64_t*) *(rbp+1);
+    //     rbp = (uint64_t*) *(rbp);
+    // }
     return 0;
 
 }
@@ -161,6 +162,8 @@ monitor(struct Trapframe *tf)
 	cprintf("Welcome to the JOS kernel monitor!\n");
 	cprintf("Type 'help' for a list of commands.\n");
 
+	if (tf != NULL)
+		print_trapframe(tf);
 
 	while (1) {
 		buf = readline("K> ");
